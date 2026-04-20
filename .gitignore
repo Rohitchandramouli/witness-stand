@@ -1,7 +1,11 @@
 # Claude Code personal files
+CLAUDE.md
 CLAUDE.local.md
 .mcp.json
-.claude/settings.local.json
+.claude/
+.agents/
+.code-review-graph/
+
 
 # Generated dossier artifacts (rebuilt at container startup)
 data/
