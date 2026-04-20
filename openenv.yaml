@@ -1,0 +1,33 @@
+name: witness_stand
+version: "1.0.0"
+description: >
+  Adversarial multi-agent RL environment where an LLM agent defends a rich
+  expert persona under cross-examination. Trains adversarial prior-statement
+  consistency and epistemic audit trail faithfulness.
+
+tasks:
+  - name: basic
+    description: Single-session inquiry. Reframer only. 10 turns. Financial domain.
+  - name: intermediate
+    description: Multi-session audit. Reframer + Authority Invoker. 20 turns. Medical domain.
+  - name: advanced
+    description: Regulatory deposition. 3 questioners. 30 turns. 2-turn lag. Safety domain.
+  - name: expert
+    description: Cross-domain tribunal. All 4 questioners. 40 turns. 3-turn lag. Uncapped reward.
+
+action_space:
+  type: text
+  fields:
+    - response_text
+    - flagged_distortion
+    - accepted_update
+
+observation_space:
+  type: dict
+  fields:
+    - questioner_text
+    - prior_statements
+    - turn_number
+    - persona_system_prompt
+
+reward_range: [0.0, 1.0]

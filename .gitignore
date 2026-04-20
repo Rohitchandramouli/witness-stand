@@ -1,0 +1,43 @@
+# Claude Code personal files
+CLAUDE.local.md
+.mcp.json
+.claude/settings.local.json
+
+# Generated dossier artifacts (rebuilt at container startup)
+data/
+data/dossier.db
+data/personas/
+data/distortions/
+
+# Logs
+logs/
+*.log
+
+# Secrets
+.env
+.env.local
+secrets.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+*.swp
+*.swo
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage

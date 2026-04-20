@@ -1,0 +1,11 @@
+{
+  "model": "claude-sonnet-4-5",
+  "permissions": {
+    "allow": ["Read", "Write", "Bash"],
+    "deny": []
+  },
+  "hooks": {
+    "PreToolUse": [".claude/hooks/pre-commit.sh"],
+    "PostToolUse": [".claude/hooks/post-edit.sh"]
+  }
+}

@@ -1,0 +1,10 @@
+fastapi>=0.110.0
+uvicorn>=0.29.0
+groq>=0.5.0
+pydantic>=2.0.0
+openenv-core>=0.2.3
+requests>=2.31.0
+python-dotenv>=1.0.0
+trl>=0.8.0
+torch>=2.0.0
+transformers>=4.40.0
