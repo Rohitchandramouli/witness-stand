@@ -1,28 +1,25 @@
-# Claude Code personal files
+# ── Claude Code — all files removed, kept ignored ─────────────
 CLAUDE.md
 CLAUDE.local.md
 .mcp.json
 .claude/
-.agents/
-.code-review-graph/
 
-
-# Generated dossier artifacts (rebuilt at container startup)
+# ── Generated dossier artifacts (rebuilt at container startup) ─
 data/
 data/dossier.db
 data/personas/
 data/distortions/
 
-# Logs
+# ── Logs ───────────────────────────────────────────────────────
 logs/
 *.log
 
-# Secrets
+# ── Secrets ────────────────────────────────────────────────────
 .env
 .env.local
 secrets.json
 
-# Python
+# ── Python ─────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
@@ -32,16 +29,16 @@ venv/
 dist/
 build/
 
-# OS
+# ── OS ─────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Editor
+# ── Editor ─────────────────────────────────────────────────────
 .vscode/settings.json
 *.swp
 *.swo
 
-# Test artifacts
+# ── Test artifacts ─────────────────────────────────────────────
 .pytest_cache/
 htmlcov/
 .coverage
