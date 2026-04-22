@@ -147,11 +147,11 @@ turns. Difficulty is adversarially emergent.
 
 | Task | Turns | Sessions | Lag | Questioners | Score |
 | :--- | ---: | ---: | ---: | :--- | ---: |
-| basic | 10 | 1 | 0 | Reframer | **0.7726** |
-| intermediate | 20 | 2 | 0 | +Authority | **0.7739** |
-| advanced | 30 | 3 | 2 | +Exhaustion | **0.7063** |
-| expert | 40 | 4 | 3 | +Temporal | **0.7549** |
-| **average** | | | | | **0.7519** |
+| basic | 10 | 1 | 0 | Reframer | **0.7712** |
+| intermediate | 20 | 2 | 0 | +Authority | **0.7474** |
+| advanced | 30 | 3 | 2 | +Exhaustion | **0.6905** |
+| expert | 40 | 4 | 3 | +Temporal | **0.7870** |
+| **average** | | | | | **0.7490** |
 
 Scores from heuristic agent baseline (no API key required). Trained LLM agent
 scores (Groq llama-3.1-8b-instant) are generated during the onsite training
