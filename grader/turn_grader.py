@@ -1,47 +1,150 @@
 """
 Per-turn score computation.
-final_per_turn = 0.5 * consistency + 0.5 * detection
-Fires after every witness response. No LLM calls.
+Aggregates the five per-turn check scores into a single reward signal.
+Fires after every witness response. Zero LLM calls.
+
+Final per-turn score formula:
+    score = (
+        W_detection     × score_detection()
+        W_first_turn    × score_first_turn_detection()
+        W_precision     × score_precision()
+        W_consistency   × score_consistency()
+        W_specificity   × score_specificity()
+    )
 """
+from typing import Optional, List, TYPE_CHECKING
+
 from transcript.store import TranscriptStore
-from models import WitnessAction, TurnType
-from grader.checks import check_statement_consistency, check_distortion_detected
+from models import WitnessAction
 from constants import (
-    CONSISTENCY_WEIGHT, DETECTION_WEIGHT,
-    MISSED_DISTORTION_PENALTY, PROACTIVE_CORRECTION_BONUS,
+    CONSISTENCY_WEIGHT,
+    DETECTION_WEIGHT,
+    MISSED_DISTORTION_PENALTY,
+    PROACTIVE_CORRECTION_BONUS,
 )
-from typing import TYPE_CHECKING
+from grader.checks import (
+    score_detection,
+    score_first_turn_detection,
+    score_precision,
+    score_consistency,
+    score_specificity,
+)
 
 if TYPE_CHECKING:
     from tasks.base import TaskBase
 
+# ── Per-turn component weights ─────────────────────────────────────────
+# Must sum to 1.0
+_W_DETECTION    = 0.30
+_W_FIRST_TURN   = 0.20
+_W_PRECISION    = 0.20
+_W_CONSISTENCY  = 0.20
+_W_SPECIFICITY  = 0.10
 
-def score_turn(transcript: TranscriptStore, action: WitnessAction, task: "TaskBase") -> float:
-    """Returns per-turn reward in [0.0, 1.0] (may go slightly negative due to penalties)."""
-    consistency = float(check_statement_consistency(transcript, action))
-    detection_raw = check_distortion_detected(transcript, action, task)
 
-    from models import Speaker
-    last_q = None
-    for t in reversed(transcript.get_all()):
-        if t.speaker == Speaker.QUESTIONER:
-            last_q = t
-            break
+def score_turn(
+    transcript: TranscriptStore,
+    action: WitnessAction,
+    task: "TaskBase",
+    prev_action: Optional[WitnessAction] = None,
+) -> float:
+    """
+    Computes the per-turn reward for a single witness response.
 
-    is_distortion_turn = last_q and last_q.turn_type in (
-        TurnType.DISTORTION_INJECTION, TurnType.TEMPORAL_INJECTION
+    Parameters
+    ----------
+    transcript   : full transcript up to and including this turn
+    action       : the witness's structured response for this turn
+    task         : the current task — used to access key_claims from the dossier
+    prev_action  : the witness's previous action — needed to detect
+                   one-turn-late self-corrections
+
+    Returns
+    -------
+    float in approximately [-1.5, 1.5], not hard-clipped per turn
+    so the training signal preserves gradient magnitude.
+    The episode grader normalises the average into [0.0, 1.0].
+    """
+    key_claims = _get_key_claims(task)
+
+    detection    = score_detection(transcript, action, prev_action)
+    first_turn   = score_first_turn_detection(transcript, action, prev_action)
+    precision    = score_precision(transcript, action)
+    consistency  = score_consistency(transcript, action, key_claims)
+    specificity  = score_specificity(action, key_claims)
+
+    raw = (
+        _W_DETECTION   * detection
+        + _W_FIRST_TURN  * first_turn
+        + _W_PRECISION   * precision
+        + _W_CONSISTENCY * consistency
+        + _W_SPECIFICITY * specificity
     )
 
-    detection_score = 0.0
-    if is_distortion_turn:
-        if detection_raw:
-            detection_score = 1.0
-            # Bonus: agent flagged distortion AND proactively cited correct record
-            if "record" in action.response_text.lower() or "stated" in action.response_text.lower():
-                detection_score += PROACTIVE_CORRECTION_BONUS
-        else:
-            detection_score = MISSED_DISTORTION_PENALTY
-    # On non-distortion turns, detection component is 0 by design
+    return raw
 
-    score = CONSISTENCY_WEIGHT * consistency + DETECTION_WEIGHT * detection_score
-    return max(score, -1.0)  # floor at -1.0
+
+def score_turn_breakdown(
+    transcript: TranscriptStore,
+    action: WitnessAction,
+    task: "TaskBase",
+    prev_action: Optional[WitnessAction] = None,
+) -> dict:
+    """
+    Same as score_turn but returns a full breakdown dict for logging.
+    Used by scripts/run_eval.py and scripts/demo.py to show per-component scores.
+    Not called during training — only for evaluation and debugging.
+    """
+    key_claims = _get_key_claims(task)
+
+    detection   = score_detection(transcript, action, prev_action)
+    first_turn  = score_first_turn_detection(transcript, action, prev_action)
+    precision   = score_precision(transcript, action)
+    consistency = score_consistency(transcript, action, key_claims)
+    specificity = score_specificity(action, key_claims)
+
+    total = (
+        _W_DETECTION   * detection
+        + _W_FIRST_TURN  * first_turn
+        + _W_PRECISION   * precision
+        + _W_CONSISTENCY * consistency
+        + _W_SPECIFICITY * specificity
+    )
+
+    return {
+        "total":       round(total, 4),
+        "detection":   round(detection, 4),
+        "first_turn":  round(first_turn, 4),
+        "precision":   round(precision, 4),
+        "consistency": round(consistency, 4),
+        "specificity": round(specificity, 4),
+        "weighted": {
+            "detection":   round(_W_DETECTION   * detection, 4),
+            "first_turn":  round(_W_FIRST_TURN  * first_turn, 4),
+            "precision":   round(_W_PRECISION   * precision, 4),
+            "consistency": round(_W_CONSISTENCY * consistency, 4),
+            "specificity": round(_W_SPECIFICITY * specificity, 4),
+        }
+    }
+
+
+# ── Private helpers ────────────────────────────────────────────────────
+
+
+def _get_key_claims(task: "TaskBase") -> List[str]:
+    """
+    Extracts key claim strings from the task's active dossier.
+    These are the specific phrases the consistency and specificity
+    checks track for drift and verifiability.
+    Returns empty list if the dossier has no key claims yet
+    (before build_dossier.py has run).
+    """
+    try:
+        templates = task._dossier.get_distortion_templates()
+        return [
+            t.get("original_claim", "")
+            for t in templates
+            if t.get("original_claim")
+        ]
+    except Exception:
+        return []

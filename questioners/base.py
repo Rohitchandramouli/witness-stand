@@ -9,14 +9,21 @@ class QuestionerBase(ABC):
 
     @abstractmethod
     def generate_turn(self, transcript: TranscriptStore, persona: PersonaConfig) -> str:
-        """Generates the next adversarial question."""
         ...
 
     @abstractmethod
     def get_turn_type(self) -> TurnType:
-        """Returns the TurnType this questioner produces."""
         ...
 
-    def reset(self) -> None:
-        """Resets internal state for a new episode."""
+    def record_outcome(self, was_detected: bool) -> None:
+        """
+        Default no-op. Stateful questioners override this to update
+        their strategy weights based on whether the witness caught the attack.
+        Called by environment.py after grader scores each injection turn.
+        """
         pass
+
+    def reset(self) -> None:
+        pass
+
+    

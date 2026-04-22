@@ -1,9 +1,3 @@
-# ── Claude Code — all files removed, kept ignored ─────────────
-CLAUDE.md
-CLAUDE.local.md
-.mcp.json
-.claude/
-
 # ── Generated dossier artifacts (rebuilt at container startup) ─
 data/
 data/dossier.db

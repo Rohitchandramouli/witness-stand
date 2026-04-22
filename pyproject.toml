@@ -1,9 +1,42 @@
 [build-system]
 requires = ["setuptools>=68"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "witness_stand"
 version = "1.0.0"
-description = "OpenEnv adversarial witness RL environment"
+description = "OpenEnv adversarial witness RL environment — Meta PyTorch × HuggingFace Hackathon 2026"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.11"
+authors = [
+    { name = "Rohit Chandramouli",  email = "rohitchandramouli12@gmail.com" },
+    { name = "Subhashree Mahimaa",  email = "subhashreemahimaa@gmail.com" },
+    { name = "Sahana Srinivasan",   email = "ssahana1608@gmail.com" },
+]
+keywords = [
+    "reinforcement-learning",
+    "openenv",
+    "adversarial",
+    "llm",
+    "multi-agent",
+    "epistemic-integrity",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Repository   = "https://github.com/Rohitchandramouli/witness-stand"
+"HF Space"   = "https://huggingface.co/spaces/therubberduckdebuggers/witness-stand"
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["*.egg-info", "data*", "logs*", "scripts*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.json"]

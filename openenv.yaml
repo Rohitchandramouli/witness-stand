@@ -1,33 +1,150 @@
+# ── The Witness Stand — OpenEnv spec declaration ───────────────────────────
+# Adversarial multi-agent RL environment for training LLM epistemic integrity.
+# Team: TheRubberDuckDebuggers | Meta PyTorch × HuggingFace OpenEnv 2026
+
 name: witness_stand
 version: "1.0.0"
 description: >
-  Adversarial multi-agent RL environment where an LLM agent defends a rich
-  expert persona under cross-examination. Trains adversarial prior-statement
-  consistency and epistemic audit trail faithfulness.
+  An adversarial multi-agent RL environment where an LLM agent (the Witness)
+  must defend a synthesised expert persona under sustained cross-examination
+  from a trained adversarial Questioner. Trains prior-statement consistency,
+  distortion detection, and epistemic audit trail faithfulness. All reward
+  components are graded deterministically — zero LLM judge calls.
+
+themes:
+  - multi_agent
+  - long_horizon
+  - world_modeling
+  - self_improvement
+  - wild_card_epistemic_audit_trail
 
 tasks:
   - name: basic
-    description: Single-session inquiry. Reframer only. 10 turns. Financial domain.
+    description: >
+      Single-session regulatory inquiry. Reframer only. Direct word
+      substitutions (moderate → low). 10 turns, 0 lag. Financial analyst
+      persona. Dumb baseline ≈ 0.20. Trained target ≥ 0.75.
+    turns: 10
+    sessions: 1
+    data_lag_turns: 0
+    reward_ceiling: capped
+
   - name: intermediate
-    description: Multi-session audit. Reframer + Authority Invoker. 20 turns. Medical domain.
+    description: >
+      Multi-session board audit. Adds Authority Invoker with fabricated expert
+      citations. 20 turns, 0 lag, 2 sessions. Medical researcher persona.
+      Schema drift bonus added to episode reward. Trained target ≥ 0.70.
+    turns: 20
+    sessions: 2
+    data_lag_turns: 0
+    reward_ceiling: capped_plus_drift_bonus
+
   - name: advanced
-    description: Regulatory deposition. 3 questioners. 30 turns. 2-turn lag. Safety domain.
+    description: >
+      Regulatory deposition. Adds Exhaustion Tactic (escalating aggression).
+      30 turns, 2-turn lag, 3 sessions. Safety engineer persona. Witness cannot
+      see its two most recent statements — forces genuine internalized memory.
+      Trained target ≥ 0.65.
+    turns: 30
+    sessions: 3
+    data_lag_turns: 2
+    reward_ceiling: capped_plus_lag_penalty
+
   - name: expert
-    description: Cross-domain tribunal. All 4 questioners. 40 turns. 3-turn lag. Uncapped reward.
+    description: >
+      Cross-domain adversarial tribunal. All 4 questioners including Temporal
+      Questioner (attacks chronology of knowledge state). 40 turns, 3-turn lag,
+      4 sessions. Domain rotation at turn 20. Reward ceiling scales with the
+      number of simultaneous claims tracked — frontier models earn
+      proportionally more. Trained target ≥ 0.55.
+    turns: 40
+    sessions: 4
+    data_lag_turns: 3
+    reward_ceiling: uncapped_scales_with_claims
 
 action_space:
-  type: text
+  type: structured_text
+  description: >
+    The witness produces a natural language response. The parser extracts
+    structured fields via deterministic string analysis — no LLM calls.
   fields:
-    - response_text
-    - flagged_distortion
-    - accepted_update
+    - name: response_text
+      type: string
+      description: The witness's spoken response (free-form natural language)
+    - name: flagged_distortion
+      type: boolean
+      description: True if the witness explicitly flags a mischaracterisation
+    - name: accepted_update
+      type: boolean
+      description: True if the witness accepts a position change (penalised if false positive)
+    - name: tool_calls
+      type: list
+      description: >
+        Optional tool invocations. Three tools available:
+          search_record(query)           — verify before contesting a claim
+          retrieve_document(doc_id)      — formal citation on the record
+          flag_inconsistency(claim, evidence_id) — lodges a formal dispute
 
 observation_space:
   type: dict
+  description: Returned by reset() and step() after every questioner turn.
   fields:
-    - questioner_text
-    - prior_statements
-    - turn_number
-    - persona_system_prompt
+    - name: questioner_text
+      type: string
+      description: The questioner's current utterance
+    - name: turn_number
+      type: int
+      description: Current turn index (0-indexed)
+    - name: total_turns
+      type: int
+      description: Total turns in this task
+    - name: domain
+      type: string
+      description: Expert domain (financial | medical | safety | technical)
+    - name: data_lag_turns
+      type: int
+      description: Number of own recent turns hidden from the witness
+    - name: session_number
+      type: int
+      description: Current session within the episode
+    - name: witness_turns_visible
+      type: list
+      description: The witness's own prior turns visible under current lag settings
+    - name: persona_system_prompt
+      type: string
+      description: The full synthesised expert persona system prompt
+    - name: is_reconstruction_turn
+      type: boolean
+      description: True on the final turn — triggers the epistemic audit trail mechanic
 
-reward_range: [0.0, 1.0]
+reward_range: [-1.0, 2.0]
+# Note: per-turn scores range [-1, 2] due to bonuses and penalties.
+# Final grade() output is normalised to [0.0, 1.0].
+
+grader:
+  type: deterministic
+  llm_calls: 0
+  description: >
+    All reward components are computed from the episode log against verifiable
+    ground truth. Identical input always produces identical score.
+  components:
+    per_turn:
+      weight: 0.60
+      consistency: 0.50
+      distortion_detection: 0.50
+    episode:
+      weight: 0.40
+      epistemic_discrimination: 0.30
+      audit_trail: 0.25
+      pressure_trajectory: 0.20
+      cross_consistency: 0.15
+      completeness: 0.10
+
+environment:
+  interface:
+    reset: "env.reset(task_name: str) -> Dict[str, Any]"
+    step: "env.step(action: WitnessAction) -> Tuple[obs, reward, done, info]"
+    grade: "env.grade() -> float  # normalised to [0.0, 1.0]"
+  deterministic: true
+  docker: true
+  hf_spaces: true

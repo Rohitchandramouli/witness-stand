@@ -10,9 +10,9 @@ from typing import List, Dict
 class TechnicalDossier(DossierBase):
     domain = "technical"
     source_urls = [
-        "https://huggingface.co/models",
-        "https://algorithmwatch.org",
-        "https://partnershiponai.org",
+    "https://huggingface.co/api/models",
+    "https://nvlpubs.nist.gov/nistpubs/ai/nist.ai.100-1.pdf",
+    "https://partnershiponai.org/resources/",
     ]
 
     def get_persona_config(self) -> PersonaConfig:
@@ -22,10 +22,17 @@ class TechnicalDossier(DossierBase):
             title="AI Systems Auditor",
             institution="Responsible AI Institute, Bengaluru",
             years_experience=9,
-            specialisation=["fairness auditing", "model card analysis", "EU AI Act compliance"],
+            specialisation=[
+                "fairness auditing across demographic subgroups",
+                "model card analysis and documentation compliance",
+                "EU AI Act and NIST AI RMF compliance assessment",
+                "bias metric interpretation and deployment risk classification",
+            ],
             professional_philosophy=(
-                "A model card is a commitment. If the deployment diverges from the card, "
-                "that is an accountability failure, not a technical one."
+                "A model card is a commitment, not a disclaimer. "
+                "If the deployment diverges from the card, that is an "
+                "accountability failure, not a technical one. I audit "
+                "against what was promised, not just what is possible."
             ),
         )
 
@@ -35,8 +42,11 @@ class TechnicalDossier(DossierBase):
     def get_false_authority_pool(self) -> List[str]:
         return [
             "Dr. Pooja Iyer, NASSCOM AI Ethics Board",
-            "Prof. Kiran Rao, IISc AI Safety Lab",
-            "Dr. Ananya Bose, MeitY Expert Panel",
+            "Prof. Kiran Rao, IISc AI Safety and Alignment Lab",
+            "Dr. Ananya Bose, MeitY Expert Panel on AI Governance",
+            "Prof. Sunil Varma, IIT Delhi Human-Centred Computing Group",
+            "Dr. Meghna Krishnan, NITI Aayog AI Task Force",
+            "Dr. Rajan Pillai, IEEE India Council on AI Standards",
         ]
 
     def get_genuine_evidence(self) -> List[Dict]:

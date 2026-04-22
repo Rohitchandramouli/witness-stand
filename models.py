@@ -31,7 +31,7 @@ class Turn:
     statement_index: Optional[int] = None
     flagged_distortion: bool = False
     accepted_update: bool = False
-    info_state: List[str] = field(default_factory=list)  # doc_ids retrieved up to this turn
+    info_state: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -40,6 +40,7 @@ class WitnessAction:
     flagged_distortion: bool = False
     accepted_update: bool = False
     tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+    reasoning_chain:     str = ""
 
 
 @dataclass
@@ -51,15 +52,16 @@ class PersonaConfig:
     years_experience: int
     specialisation: List[str]
     professional_philosophy: str
-    system_prompt: str = ""  # populated by persona_builder.py
+    system_prompt: str = ""
 
 
 @dataclass
 class EpisodeLog:
-    episode_id: str
-    task_name: str
-    persona: PersonaConfig
-    turns: List[Turn] = field(default_factory=list)
+    episode_id:      str
+    task_name:       str
+    persona:         PersonaConfig
+    domain:          str = ""
+    turns:           List[Turn] = field(default_factory=list)
     per_turn_scores: List[float] = field(default_factory=list)
-    episode_score: float = 0.0
-    final_score: float = 0.0
+    episode_score:   float = 0.0
+    final_score:     float = 0.0

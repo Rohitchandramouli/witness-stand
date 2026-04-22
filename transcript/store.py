@@ -1,15 +1,11 @@
-"""
-Shared transcript store. Read by questioners, grader, agent memory, obs builder.
-This is the spine of the entire environment — do not move inside another module.
-"""
 from typing import List, Optional
-from models import Turn, Speaker, TurnType
-from constants import DATA_LAG_TURNS
+from models import Turn, Speaker
 
 
 class TranscriptStore:
-    def __init__(self):
+    def __init__(self, data_lag_turns: int = 0):
         self._turns: List[Turn] = []
+        self._data_lag_turns = data_lag_turns
 
     def append(self, turn: Turn) -> None:
         self._turns.append(turn)
@@ -18,10 +14,10 @@ class TranscriptStore:
         return list(self._turns)
 
     def get_witness_turns(self, exclude_recent: int = 0) -> List[Turn]:
-        """Returns witness turns with lag applied — agent cannot see most recent N."""
         witness_turns = [t for t in self._turns if t.speaker == Speaker.WITNESS]
-        if exclude_recent > 0:
-            witness_turns = witness_turns[:-exclude_recent] if len(witness_turns) > exclude_recent else []
+        lag = max(exclude_recent, self._data_lag_turns)
+        if lag > 0:
+            witness_turns = witness_turns[:-lag] if len(witness_turns) > lag else []
         return witness_turns
 
     def last_questioner_turn(self) -> Optional[str]:
@@ -31,11 +27,9 @@ class TranscriptStore:
         return None
 
     def snapshot(self) -> List[Turn]:
-        """Returns immutable copy for grader evaluation."""
         return list(self._turns)
 
     def get_info_state(self, up_to_turn: int) -> List[str]:
-        """Returns all doc_ids retrieved up to a given turn number."""
         docs = []
         for t in self._turns:
             if t.turn_no <= up_to_turn:
