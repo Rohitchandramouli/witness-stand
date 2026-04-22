@@ -1,4 +1,5 @@
-from tasks.task_basic import TaskBasic, NeutralQuestioner
+from tasks.task_basic import TaskBasic
+from questioners.neutral import NeutralQuestioner
 from tasks.task_intermediate import TaskIntermediate
 from tasks.task_advanced import TaskAdvanced
 from tasks.task_expert import TaskExpert

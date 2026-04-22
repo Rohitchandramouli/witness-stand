@@ -27,13 +27,14 @@ from grader.checks import (
 )
 
 
-# ── Episode component weights ──────────────────────────────────────────
-# Must sum to 1.0
-_W_DISCRIMINATION    = 0.30
-_W_AUDIT_TRAIL       = 0.25
-_W_TRAJECTORY        = 0.20
-_W_CROSS_CONSISTENCY = 0.15
-_W_COMPLETENESS      = 0.10
+# ── Episode component weights — imported from constants.py (single source of truth)
+from constants import (
+    EPISODE_W_DISCRIMINATION    as _W_DISCRIMINATION,
+    EPISODE_W_AUDIT_TRAIL       as _W_AUDIT_TRAIL,
+    EPISODE_W_TRAJECTORY        as _W_TRAJECTORY,
+    EPISODE_W_CROSS_CONSISTENCY as _W_CROSS_CONSISTENCY,
+    EPISODE_W_COMPLETENESS      as _W_COMPLETENESS,
+)
 
 # Expert task uncapped multiplier ceiling
 _EXPERT_MULTIPLIER_CAP = 3.0

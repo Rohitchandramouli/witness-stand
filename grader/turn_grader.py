@@ -17,8 +17,6 @@ from typing import Optional, List, TYPE_CHECKING
 from transcript.store import TranscriptStore
 from models import WitnessAction
 from constants import (
-    CONSISTENCY_WEIGHT,
-    DETECTION_WEIGHT,
     MISSED_DISTORTION_PENALTY,
     PROACTIVE_CORRECTION_BONUS,
 )
@@ -33,13 +31,14 @@ from grader.checks import (
 if TYPE_CHECKING:
     from tasks.base import TaskBase
 
-# ── Per-turn component weights ─────────────────────────────────────────
-# Must sum to 1.0
-_W_DETECTION    = 0.30
-_W_FIRST_TURN   = 0.20
-_W_PRECISION    = 0.20
-_W_CONSISTENCY  = 0.20
-_W_SPECIFICITY  = 0.10
+# ── Per-turn component weights — imported from constants.py (single source of truth)
+from constants import (
+    TURN_W_DETECTION   as _W_DETECTION,
+    TURN_W_FIRST_TURN  as _W_FIRST_TURN,
+    TURN_W_PRECISION   as _W_PRECISION,
+    TURN_W_CONSISTENCY as _W_CONSISTENCY,
+    TURN_W_SPECIFICITY as _W_SPECIFICITY,
+)
 
 
 def score_turn(

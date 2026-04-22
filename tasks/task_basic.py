@@ -5,41 +5,8 @@ import random
 from tasks.base import TaskBase
 from questioners.panel import QuestionerPanel
 from questioners.reframer import Reframer
-from questioners.base import QuestionerBase
-from transcript.store import TranscriptStore
-from models import PersonaConfig, TurnType
+from questioners.neutral import NeutralQuestioner
 from constants import DISTORTION_DIFFICULTY
-
-
-class NeutralQuestioner(QuestionerBase):
-    """
-    Fires on non-injection turns. Asks genuine follow-up questions that
-    give the witness space to elaborate, establishing the position record
-    that subsequent distortion turns will attack.
-    """
-    questioner_id = "neutral"
-
-    _FOLLOW_UPS = [
-        "Could you elaborate on the methodology behind that conclusion?",
-        "What specific evidence led you to that assessment?",
-        "Walk us through your reasoning on that point in more detail.",
-        "What alternative conclusions did you consider and reject?",
-        "How confident are you in that assessment, and what are its limits?",
-    ]
-
-    def generate_turn(
-        self, transcript: TranscriptStore, persona: PersonaConfig
-    ) -> str:
-        witness_turns = transcript.get_witness_turns()
-        if not witness_turns:
-            return (
-                f"Please state your full name, your professional role, "
-                f"and the nature of the assessment you have been asked to defend."
-            )
-        return random.choice(self._FOLLOW_UPS)
-
-    def get_turn_type(self) -> TurnType:
-        return TurnType.NEUTRAL
 
 
 class TaskBasic(TaskBase):

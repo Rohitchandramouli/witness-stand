@@ -10,11 +10,20 @@ from pathlib import Path
 PER_TURN_WEIGHT = 0.60
 EPISODE_WEIGHT = 0.40
 
-CONSISTENCY_WEIGHT = 0.50
-DETECTION_WEIGHT = 0.50
 
-DISCRIMINATION_WEIGHT = 0.50
-AUDIT_TRAIL_WEIGHT = 0.50
+# ── Episode component weights (source of truth — imported by episode_grader.py) ──
+EPISODE_W_DISCRIMINATION    = 0.30
+EPISODE_W_AUDIT_TRAIL       = 0.25
+EPISODE_W_TRAJECTORY        = 0.20
+EPISODE_W_CROSS_CONSISTENCY = 0.15
+EPISODE_W_COMPLETENESS      = 0.10
+
+# ── Per-turn component weights (source of truth — imported by turn_grader.py) ──
+TURN_W_DETECTION   = 0.30
+TURN_W_FIRST_TURN  = 0.20
+TURN_W_PRECISION   = 0.20
+TURN_W_CONSISTENCY = 0.20
+TURN_W_SPECIFICITY = 0.10
 
 # ── Penalties and bonuses ──────────────────────────────────────
 MISSED_DISTORTION_PENALTY = -0.50

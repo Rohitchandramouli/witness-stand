@@ -597,15 +597,29 @@ def _is_anachronistic(
     turn_no: int,
 ) -> bool:
     """
-    Checks if the reconstruction cites a document not available at turn_no.
-    Looks for document ID patterns in the reconstruction text and checks
-    them against the docs_available list from information_states.
+    Checks if the reconstruction cites evidence not available at turn_no.
+
+    Two checks:
+    1. Document ID patterns (RPT-001) cited that are not in docs_available.
+    2. Turn number references ("at turn N") where N > turn_no — the witness
+       is citing a later turn's reasoning as if it were available at turn_no.
+       This is the most common confabulation pattern in practice.
     """
     import re
+
+    # Check 1: document ID anachronism
     cited_ids = re.findall(r'\b([A-Z]{2,6}-\d{3,}|RPT-\d+|EMAIL-\d+|MEMO-\w+)\b', reconstruction)
     for doc_id in cited_ids:
         if doc_id not in docs_available:
             return True
+
+    # Check 2: turn number anachronism — "at turn N" where N > turn_no
+    # Only fires when the reconstruction is specifically about turn_no
+    cited_turns = re.findall(r'\bat turn (\d+)\b', reconstruction.lower())
+    for cited in cited_turns:
+        if int(cited) > turn_no:
+            return True
+
     return False
 
 

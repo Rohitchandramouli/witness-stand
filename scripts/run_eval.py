@@ -16,9 +16,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from environment import WitnessStandEnv
 from agent.memory import EpisodicMemory
+from agent.heuristics import WitnessHeuristics
 from agent.prompt import build_system_prompt, build_user_prompt
 from agent.parser import parse_action
-from models import Turn, Speaker
+from models import Turn, Speaker, TurnType
 from constants import WITNESS_MODEL, GROQ_API_BASE
 
 import os
@@ -104,14 +105,30 @@ def run_task(task_name: str, rollouts: int, quiet: bool) -> dict:
     for rollout_idx in range(rollouts):
         if not quiet:
             print(f"    rollout {rollout_idx + 1}/{rollouts}")
-        memory = EpisodicMemory()
+        memory     = EpisodicMemory()
+        heuristics = WitnessHeuristics()
         obs = env.reset(task_name)
         done = False
 
         while not done:
-            system_prompt = build_system_prompt(env.task.persona)
-            user_prompt   = build_user_prompt(
-                obs["questioner_text"], memory, obs["turn_number"]
+            # Fix 3: resolve attack_type from obs so witness gets targeted guidance
+            raw_type    = obs.get("turn_type", "neutral")
+            attack_type = TurnType(raw_type) if raw_type in [e.value for e in TurnType] else TurnType.NEUTRAL
+
+            system_prompt = build_system_prompt(
+                env.task.persona,
+                attack_type=attack_type,
+                heuristics=heuristics,
+            )
+            user_prompt = build_user_prompt(
+                obs["questioner_text"],
+                memory,
+                obs["turn_number"],
+                total_turns=obs["total_turns"],
+                domain=obs["domain"],
+                session_number=obs["session_number"],
+                data_lag_turns=obs["data_lag_turns"],
+                is_reconstruction=obs.get("is_reconstruction_turn", False),
             )
             response_text = call_llm(system_prompt, user_prompt)
             action = parse_action(response_text)
@@ -123,8 +140,19 @@ def run_task(task_name: str, rollouts: int, quiet: bool) -> dict:
             ))
 
             obs, reward, done, _ = env.step(action)
+
+            # Fix 2: wire heuristics so strategy library learns across turns
+            heuristics.log_turn(
+                attack_type=attack_type,
+                strategy_used=heuristics.suggest_strategy(attack_type),
+                turn_score=reward,
+                flagged_distortion=action.flagged_distortion,
+                accepted_update=action.accepted_update,
+            )
+
             time.sleep(INTER_TURN_SLEEP)   # rate limit buffer
 
+        heuristics.end_episode()
         final_score = env.grade()
         scores.append(final_score)
         if not quiet:

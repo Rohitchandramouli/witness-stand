@@ -63,7 +63,7 @@ from agent.prompt import build_system_prompt, build_user_prompt
 from agent.parser import parse_action
 from agent.memory import EpisodicMemory
 from grader.episode_grader import score_episode
-from models import Turn, Speaker
+from models import Turn, Speaker, TurnType
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -183,7 +183,9 @@ def run_episode(
     turn = 0
 
     while not done:
-        system_prompt = build_system_prompt(env.task.persona)
+        raw_type    = obs.get("turn_type", "neutral")
+        attack_type = TurnType(raw_type) if raw_type in [e.value for e in TurnType] else TurnType.NEUTRAL
+        system_prompt = build_system_prompt(env.task.persona, attack_type=attack_type)
         user_prompt = build_user_prompt(
             questioner_text=obs["questioner_text"],
             memory=memory,
@@ -273,7 +275,9 @@ def build_prompt_dataset(n: int) -> Dataset:
 
     for _ in range(n):
         obs = env.reset(cfg.task_name)
-        system_prompt = build_system_prompt(env.task.persona)
+        raw_type    = obs.get("turn_type", "neutral")
+        attack_type = TurnType(raw_type) if raw_type in [e.value for e in TurnType] else TurnType.NEUTRAL
+        system_prompt = build_system_prompt(env.task.persona, attack_type=attack_type)
 
         # Track domain distribution to verify random rotation
         domain = env.task.domain

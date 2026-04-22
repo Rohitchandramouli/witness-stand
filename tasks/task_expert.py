@@ -3,7 +3,7 @@ import random
 from typing import List, Tuple, Type
 
 from tasks.base import TaskBase
-from tasks.task_basic import NeutralQuestioner
+from questioners.neutral import NeutralQuestioner
 from questioners.panel import QuestionerPanel
 from questioners.reframer import Reframer
 from questioners.authority import AuthorityInvoker
