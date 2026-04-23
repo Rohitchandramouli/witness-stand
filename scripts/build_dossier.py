@@ -27,6 +27,7 @@ import uuid
 from pathlib import Path
 from typing import List, Dict, Any
 
+import re
 import requests
 from dotenv import load_dotenv
 from groq import Groq
@@ -510,7 +511,6 @@ Example entry:
         # Strip all markdown and whitespace aggressively
         content = content.strip()
         # Remove ```json ... ``` or ``` ... ``` fences
-        import re
         content = re.sub(r'^```(?:json)?\s*', '', content, flags=re.MULTILINE)
         content = re.sub(r'```\s*$', '', content, flags=re.MULTILINE)
         content = content.strip()

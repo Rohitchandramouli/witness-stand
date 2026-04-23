@@ -24,7 +24,16 @@ class NeutralQuestioner(QuestionerBase):
         "Walk us through your reasoning on that point in more detail.",
         "What alternative conclusions did you consider and reject?",
         "How confident are you in that assessment, and what are its limits?",
+        "What assumptions underpin that conclusion?",
+        "How would you characterise the uncertainty in that assessment?",
+        "Which aspects of your analysis are you most confident about?",
     ]
+
+    def __init__(self):
+        self._used_indices: set = set()
+
+    def reset(self) -> None:
+        self._used_indices = set()
 
     def generate_turn(
         self, transcript: TranscriptStore, persona: PersonaConfig
@@ -32,7 +41,18 @@ class NeutralQuestioner(QuestionerBase):
         witness_turns = transcript.get_witness_turns()
         if not witness_turns:
             return self._OPENING
-        return random.choice(self._FOLLOW_UPS)
+
+        available = [
+            (i, q) for i, q in enumerate(self._FOLLOW_UPS)
+            if i not in self._used_indices
+        ]
+        if not available:
+            self._used_indices.clear()
+            available = list(enumerate(self._FOLLOW_UPS))
+
+        idx, question = random.choice(available)
+        self._used_indices.add(idx)
+        return question
 
     def get_turn_type(self) -> TurnType:
         return TurnType.NEUTRAL

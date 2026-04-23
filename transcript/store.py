@@ -6,9 +6,12 @@ class TranscriptStore:
     def __init__(self, data_lag_turns: int = 0):
         self._turns: List[Turn] = []
         self._data_lag_turns = data_lag_turns
+        self._last_questioner: Optional[Turn] = None
 
     def append(self, turn: Turn) -> None:
         self._turns.append(turn)
+        if turn.speaker == Speaker.QUESTIONER:
+            self._last_questioner = turn
 
     def get_all(self) -> List[Turn]:
         return list(self._turns)
@@ -21,10 +24,17 @@ class TranscriptStore:
         return witness_turns
 
     def last_questioner_turn(self) -> Optional[str]:
-        for turn in reversed(self._turns):
-            if turn.speaker == Speaker.QUESTIONER:
-                return turn.text
-        return None
+        t = self.last_questioner_turn_obj()
+        return t.text if t else None
+
+    def last_questioner_turn_obj(self) -> Optional[Turn]:
+        """Returns the most recent questioner Turn object. O(1) via cached pointer."""
+        if self._last_questioner is None:
+            for turn in reversed(self._turns):
+                if turn.speaker == Speaker.QUESTIONER:
+                    self._last_questioner = turn
+                    break
+        return self._last_questioner
 
     def snapshot(self) -> List[Turn]:
         return list(self._turns)

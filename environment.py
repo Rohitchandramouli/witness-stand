@@ -178,7 +178,7 @@ class WitnessStandEnv:
             persona=self.task.persona,
         )
         turn_type = self.task.panel.get_turn_type(self._current_turn)
-        active_q  = self.task.panel._schedule.get(self._current_turn, self.task.panel._default)
+        active_q  = self.task.panel.get_active_questioner(self._current_turn)
         q_turn = Turn(
             turn_no=self._current_turn,
             speaker=Speaker.QUESTIONER,

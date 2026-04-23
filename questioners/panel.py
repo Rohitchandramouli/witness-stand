@@ -46,6 +46,10 @@ class QuestionerPanel:
         questioner = self._schedule.get(turn_number, self._default)
         return questioner.get_turn_type()
 
+    def get_active_questioner(self, turn_number: int) -> QuestionerBase:
+        """Returns the questioner instance that fires at the given turn.""";
+        return self._schedule.get(turn_number, self._default)
+
     def record_outcome(self, was_detected: bool) -> None:
         """
         Routes outcome feedback to whichever questioner fired last.

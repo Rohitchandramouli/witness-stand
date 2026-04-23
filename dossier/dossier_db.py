@@ -10,10 +10,18 @@ from typing import List, Dict, Optional
 from constants import DB_PATH
 
 
+def _get_conn():
+    """Returns a sqlite3 connection with row_factory set."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 def init_db() -> None:
     """Creates all tables if they don't exist. Safe to call multiple times."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
     c.execute("""
@@ -73,8 +81,7 @@ def search_record(query: str, domain: Optional[str] = None) -> List[Dict]:
     Returns up to 5 matching records as fact cards.
     Used by the witness to verify an external claim before contesting it.
     """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _get_conn()
     c = conn.cursor()
 
     sql = """
@@ -102,8 +109,7 @@ def retrieve_document(doc_id: str, version: Optional[str] = None) -> Optional[Di
     The witness already knows what this document says — retrieval is a
     citation action, not a lookup. Optionally filters to a specific version.
     """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _get_conn()
     c = conn.cursor()
 
     sql = "SELECT * FROM documents WHERE doc_id = ?"
@@ -140,8 +146,7 @@ def get_distortions_for_domain(domain: str, difficulty: List[int]) -> List[Dict]
     Returns distortion templates for a given domain and difficulty range.
     Called by the panel scheduler when loading the injection pool for a task.
     """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _get_conn()
     c = conn.cursor()
 
     placeholders = ",".join("?" * len(difficulty))
@@ -169,6 +174,7 @@ def log_information_state(
     Read by episode_grader.py for audit trail verification.
     """
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("""
         INSERT OR REPLACE INTO information_states
@@ -191,8 +197,7 @@ def get_information_state(episode_id: str, turn_number: int) -> Optional[Dict]:
     Used by episode_grader.py to check temporal consistency:
     did the witness cite evidence that was available at that turn?
     """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _get_conn()
     c = conn.cursor()
     row = c.execute("""
         SELECT * FROM information_states

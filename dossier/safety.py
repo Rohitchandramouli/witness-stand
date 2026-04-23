@@ -36,8 +36,25 @@ class SafetyDossier(DossierBase):
             ),
         )
 
+
     def get_distortion_templates(self) -> List[Dict]:
+        """
+        Returns distortion templates for this domain.
+        Loads from SQLite DB if available (populated by build_dossier.py).
+        Falls back to empty list only if DB has no entries — in that case
+        the Reframer falls back to transcript-based distortions.
+        """
+        try:
+            from dossier.dossier_db import get_distortions_for_domain
+            from constants import DISTORTION_DIFFICULTY
+            # Load all difficulty levels — tasks filter by their own pool
+            rows = get_distortions_for_domain(self.domain, [1, 2, 3, 4])
+            if rows:
+                return rows
+        except Exception:
+            pass
         return []
+
 
     def get_false_authority_pool(self) -> List[str]:
         return [
@@ -49,5 +66,14 @@ class SafetyDossier(DossierBase):
             "Dr. Vikram Sood, NTPC Safety Directorate",
         ]
 
+
     def get_genuine_evidence(self) -> List[Dict]:
-        return []
+        """
+        Returns genuine evidence records for this domain from the DB.
+        Used for the symmetric discrimination mechanic.
+        """
+        try:
+            from dossier.dossier_db import search_record
+            return search_record("genuine", domain=self.domain)
+        except Exception:
+            return []

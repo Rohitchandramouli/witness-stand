@@ -17,7 +17,7 @@ from typing import List, Dict, Any, Optional
 
 from models import EpisodeLog, TurnType, Speaker
 from transcript.store import TranscriptStore
-from constants import PER_TURN_WEIGHT, EPISODE_WEIGHT
+from constants import PER_TURN_WEIGHT, EPISODE_WEIGHT, EPISODE_TURNS
 from grader.checks import (
     score_discrimination,
     score_audit_trail,
@@ -234,8 +234,12 @@ def _compute_avg_per_turn(log: EpisodeLog) -> float:
 
     raw_avg = sum(log.per_turn_scores) / len(log.per_turn_scores)
 
-    # Shift from [-1.5, 1.5] to [0.0, 3.0], then divide by 3.0
-    normalised = (raw_avg + 1.5) / 3.0
+    # Actual per-turn range: approx [-0.60, 0.90] based on weight analysis.
+    # Shift and scale to [0.0, 1.0] using calibrated bounds.
+    _TURN_MIN = -0.60
+    _TURN_MAX =  0.90
+    _TURN_RANGE = _TURN_MAX - _TURN_MIN  # 1.50
+    normalised = (raw_avg - _TURN_MIN) / _TURN_RANGE
     return max(0.0, min(1.0, normalised))
 
 
@@ -257,12 +261,12 @@ def _extract_exhaustion_results(
             turn.speaker == Speaker.QUESTIONER
             and turn.turn_type == TurnType.EXHAUSTION
         ):
-            # Find the witness turn that immediately follows
+            # Find the witness turn at the same turn_no (questioner + witness share turn_no)
             witness_response = next(
                 (
                     t for t in all_turns
                     if t.speaker == Speaker.WITNESS
-                    and t.turn_no == turn.turn_no + 1
+                    and t.turn_no == turn.turn_no
                 ),
                 None,
             )
@@ -320,5 +324,4 @@ def _apply_expert_multiplier(
 
 
 def _task_total_turns(task_name: str) -> int:
-    from constants import EPISODE_TURNS
     return EPISODE_TURNS.get(task_name, 30)

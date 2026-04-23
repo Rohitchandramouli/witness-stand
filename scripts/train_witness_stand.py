@@ -62,6 +62,7 @@ from environment import WitnessStandEnv
 from agent.prompt import build_system_prompt, build_user_prompt
 from agent.parser import parse_action
 from agent.memory import EpisodicMemory
+from agent.heuristics import WitnessHeuristics
 from grader.episode_grader import score_episode
 from models import Turn, Speaker, TurnType
 
@@ -176,6 +177,7 @@ def run_episode(
     """
     env = WitnessStandEnv()
     memory = EpisodicMemory()
+    heuristics = WitnessHeuristics()
     obs = env.reset(task_name)
     per_turn_scores = []
     prev_action = None
@@ -209,7 +211,15 @@ def run_episode(
         per_turn_scores.append(turn_reward)
         prev_action = action
         turn += 1
+        heuristics.log_turn(
+            attack_type=attack_type,
+            strategy_used=heuristics.suggest_strategy(attack_type),
+            turn_score=turn_reward,
+            flagged_distortion=action.flagged_distortion,
+            accepted_update=action.accepted_update,
+        )
 
+    heuristics.end_episode()
     # Episode-level grading
     reconstruction = prev_action.response_text if prev_action else ""
     env.episode_log.per_turn_scores = per_turn_scores

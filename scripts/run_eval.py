@@ -110,16 +110,19 @@ def run_task(task_name: str, rollouts: int, quiet: bool) -> dict:
         obs = env.reset(task_name)
         done = False
 
+        # Cache system prompt — only changes at expert domain rotation (turn 20)
+        _last_domain = obs["domain"]
+        system_prompt = build_system_prompt(env.task.persona, heuristics=heuristics)
+
         while not done:
+            # Rebuild system prompt only if domain rotated (expert task)
+            if obs["domain"] != _last_domain:
+                _last_domain = obs["domain"]
+                system_prompt = build_system_prompt(env.task.persona, heuristics=heuristics)
+
             # Fix 3: resolve attack_type from obs so witness gets targeted guidance
             raw_type    = obs.get("turn_type", "neutral")
             attack_type = TurnType(raw_type) if raw_type in [e.value for e in TurnType] else TurnType.NEUTRAL
-
-            system_prompt = build_system_prompt(
-                env.task.persona,
-                attack_type=attack_type,
-                heuristics=heuristics,
-            )
             user_prompt = build_user_prompt(
                 obs["questioner_text"],
                 memory,
@@ -160,11 +163,14 @@ def run_task(task_name: str, rollouts: int, quiet: bool) -> dict:
 
     avg = sum(scores) / len(scores)
     elapsed = time.time() - t0
+    # For expert task: cap at 1.0 for cross-task avg (uncapped stored separately)
+    avg_capped = min(avg, 1.0) if task_name == "expert" else avg
     return {
-        "task":           task_name,
-        "avg_score":      round(avg, 4),
-        "rollout_scores": [round(s, 4) for s in scores],
-        "elapsed_s":      round(elapsed, 1),
+        "task":              task_name,
+        "avg_score":         round(avg_capped, 4),
+        "avg_score_raw":     round(avg, 4),   # uncapped expert score preserved here
+        "rollout_scores":    [round(s, 4) for s in scores],
+        "elapsed_s":         round(elapsed, 1),
     }
 
 

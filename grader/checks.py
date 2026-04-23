@@ -1,3 +1,4 @@
+import re
 """
 Grader check functions — all deterministic Python, zero LLM calls.
 Mix of binary and continuous [0.0, 1.0] scorers.
@@ -319,7 +320,7 @@ def score_audit_trail(
         claim_text = claim.get("original_claim", "").lower()
         turn_no = claim.get("turn_no", 0)
 
-        if not claim_text or claim_text[:20] not in recon_lower:
+        if not claim_text or (claim_text[:40] not in recon_lower and claim_text[:20] not in recon_lower):
             # Not addressed — completeness penalty applies later
             total += 0.0
             continue
@@ -448,7 +449,8 @@ def score_reconstruction_completeness(
     recon_lower = reconstruction.lower()
     covered = sum(
         1 for claim in contested_claims
-        if claim.get("original_claim", "").lower()[:20] in recon_lower
+        if (claim.get("original_claim", "").lower()[:40] in recon_lower or
+            claim.get("original_claim", "").lower()[:20] in recon_lower)
     )
 
     n = len(contested_claims)
@@ -462,15 +464,12 @@ def score_reconstruction_completeness(
 
 
 def _last_questioner_turn(transcript: TranscriptStore):
-    for turn in reversed(transcript.get_all()):
-        if turn.speaker == Speaker.QUESTIONER:
-            return turn
-    return None
+    """O(1) via TranscriptStore cache — no full scan.""";
+    return transcript.last_questioner_turn_obj()
 
 
 def _contains_turn_reference(text: str) -> bool:
     """Checks if the response references a specific prior turn number."""
-    import re
     return bool(re.search(r"\bturn\s+\d+\b", text))
 
 
@@ -479,7 +478,6 @@ def _quotes_prior_language(response: str, witness_turns: List[Turn]) -> bool:
     Checks if the response quotes language from an actual prior witness turn.
     Looks for quoted strings of 8+ chars that appear in any prior turn.
     """
-    import re
     quoted = re.findall(r'["\u201c\u201d](.{8,80})["\u201c\u201d]', response)
     for quote in quoted:
         for turn in witness_turns:
@@ -497,12 +495,10 @@ def _cited_document(tool_calls: List[Dict[str, Any]]) -> bool:
 
 
 def _contains_number(text: str) -> bool:
-    import re
     return bool(re.search(r'\b\d+\.?\d*\s*(%|bps|per cent|percent|rp[mn]|sil|mmtpa)?\b', text.lower()))
 
 
 def _contains_date_reference(text: str) -> bool:
-    import re
     return bool(re.search(
         r'\b(january|february|march|april|may|june|july|august|'
         r'september|october|november|december|q[1-4]|20\d{2}|19\d{2})\b',
@@ -511,7 +507,6 @@ def _contains_date_reference(text: str) -> bool:
 
 
 def _contains_document_reference(text: str) -> bool:
-    import re
     return bool(re.search(
         r'\b([A-Z]{2,6}-\d{3,}|RPT-\d+|EMAIL-\d+|MEMO-\w+|IS\s+\d+)\b',
         text
@@ -605,7 +600,6 @@ def _is_anachronistic(
        is citing a later turn's reasoning as if it were available at turn_no.
        This is the most common confabulation pattern in practice.
     """
-    import re
 
     # Check 1: document ID anachronism
     cited_ids = re.findall(r'\b([A-Z]{2,6}-\d{3,}|RPT-\d+|EMAIL-\d+|MEMO-\w+)\b', reconstruction)
