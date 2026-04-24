@@ -153,52 +153,32 @@ def build_user_prompt(
 # ── Private helpers ───────────────────────────────────────────────────
 
 
-def _build_memory_block(
-    memory: EpisodicMemory,
-    data_lag_turns: int,
-) -> str:
-    """
-    Builds the formatted memory block showing prior witness statements.
-    Respects the data lag — hides the most recent `data_lag_turns` turns.
-    If memory is empty or all turns are lagged, returns a placeholder.
-    """
+def _build_memory_block(memory: EpisodicMemory, data_lag_turns: int) -> str:
+    """Formats visible prior witness turns. Lag applied via EpisodicMemory.get_all()."""
     all_turns = memory.get_all()
-
-    # Apply lag: hide the most recent data_lag_turns turns
-    if data_lag_turns > 0 and len(all_turns) > data_lag_turns:
-        visible_turns = all_turns[:-data_lag_turns]
-    else:
-        visible_turns = all_turns if data_lag_turns == 0 else []
-
-    if not visible_turns:
+    visible = all_turns[:-data_lag_turns] if data_lag_turns > 0 and len(all_turns) > data_lag_turns else (all_turns if data_lag_turns == 0 else [])
+    if not visible:
         return "(No prior statements on record yet.)"
-
-    # Show most recent first — easier to check for distortions
     lines = []
-    for turn in reversed(visible_turns):
+    for turn in reversed(visible):
         excerpt = turn.text[:200].strip()
         if len(turn.text) > 200:
             excerpt += "..."
         lines.append(f"[Turn {turn.turn_no}] {excerpt}")
-
     return "\n\n".join(lines)
 
 
-def _build_reconstruction_prompt(
-    questioner_text: str,
-    memory: EpisodicMemory,
-) -> str:
-    """
-    Builds the reconstruction-turn user prompt.
-    Shows the full memory — no lag applied — so the witness has
-    access to all its prior statements for reconstruction.
-    """
-    full_memory_block = memory.build_context_block(n=40)
-    if not full_memory_block:
-        full_memory_block = "(No prior statements recorded.)"
-
+def _build_reconstruction_prompt(questioner_text: str, memory: EpisodicMemory) -> str:
+    """Full memory shown — no lag — for audit reconstruction."""
+    turns = memory.get_all()
+    if not turns:
+        full_block = "(No prior statements recorded.)"
+    else:
+        lines = [f"[Turn {t.turn_no}] {t.text[:200].strip()}{'...' if len(t.text)>200 else ''}"
+                 for t in turns]
+        full_block = "\n\n".join(lines)
     return _RECONSTRUCTION_TEMPLATE.format(
-        full_memory_block=full_memory_block,
+        full_memory_block=full_block,
         questioner_text=questioner_text,
     )
 

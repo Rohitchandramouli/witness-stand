@@ -17,8 +17,6 @@ from tasks.registry import get_task
 from tasks.task_expert import TaskExpert
 from transcript.store import TranscriptStore
 from dossier.dossier_db import init_db, log_information_state
-from questioners.exhaustion import ExhaustionTactic
-from questioners.temporal import TemporalQuestioner
 from grader.turn_grader import score_turn
 from grader.episode_grader import score_episode
 from models import (

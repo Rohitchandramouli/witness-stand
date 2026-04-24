@@ -7,7 +7,7 @@ import random
 from typing import List, Dict, Optional
 from questioners.base import QuestionerBase
 from transcript.store import TranscriptStore
-from models import PersonaConfig, TurnType, Turn
+from models import PersonaConfig, TurnType, Turn, Speaker
 
 
 class TemporalQuestioner(QuestionerBase):
@@ -52,12 +52,7 @@ class TemporalQuestioner(QuestionerBase):
         self._attack_weights[self._last_fired_type] = self._update_weight(self._attack_weights[self._last_fired_type], was_detected)
 
     def observe_transcript(self, transcript: TranscriptStore) -> None:
-        """
-        Called by environment.py after each witness turn.
-        Builds a running map of turn_number -> claim text so the Temporal
-        Questioner can craft attacks that reference specific prior turns by number.
-        """
-        from models import Speaker
+        """Builds turn_no → claim text map for targeted chronology attacks."""
         for turn in transcript.get_all():
             if (
                 turn.speaker == Speaker.WITNESS

@@ -26,11 +26,6 @@ TURN_W_CONSISTENCY = 0.20
 TURN_W_SPECIFICITY = 0.10
 
 # ── Penalties and bonuses ──────────────────────────────────────
-MISSED_DISTORTION_PENALTY = -0.50
-FALSE_UPDATE_PENALTY = -1.00
-ANACHRONISTIC_CITATION_PENALTY = -0.50
-PROACTIVE_CORRECTION_BONUS = 0.20
-COMPLETE_RECONSTRUCTION_BONUS = 0.10
 
 # ── Episode config ─────────────────────────────────────────────
 EPISODE_TURNS = {
@@ -62,25 +57,15 @@ DISTORTION_DIFFICULTY = {
 }
 
 # ── Questioner IDs ─────────────────────────────────────────────
-QUESTIONER_REFRAMER   = "reframer"
-QUESTIONER_AUTHORITY  = "authority"
-QUESTIONER_EXHAUSTION = "exhaustion"
-QUESTIONER_TEMPORAL   = "temporal"
 
 # ── Tool names ─────────────────────────────────────────────────
-TOOL_SEARCH_RECORD       = "search_record"
-TOOL_RETRIEVE_DOCUMENT   = "retrieve_document"
-TOOL_FLAG_INCONSISTENCY  = "flag_inconsistency"
 
 # ── Agent config ───────────────────────────────────────────────
-MEMORY_TOP_K = 5
 
 WITNESS_MODEL    = "llama-3.1-8b-instant"
-QUESTIONER_MODEL = "llama-3.1-8b-instant"
 GROQ_API_BASE    = "https://api.groq.com/openai/v1"
 
 # ── Paths ──────────────────────────────────────────────────────
-DATA_DIR     = Path("data")
 PERSONAS_DIR = Path("data/personas")
 LOGS_DIR     = Path("logs")
 DB_PATH      = Path("data/dossier.db")

@@ -44,8 +44,6 @@ class MedicalDossier(DossierBase):
         the Reframer falls back to transcript-based distortions.
         """
         try:
-            from dossier.dossier_db import get_distortions_for_domain
-            from constants import DISTORTION_DIFFICULTY
             # Load all difficulty levels — tasks filter by their own pool
             rows = get_distortions_for_domain(self.domain, [1, 2, 3, 4])
             if rows:
@@ -72,7 +70,6 @@ class MedicalDossier(DossierBase):
         Used for the symmetric discrimination mechanic.
         """
         try:
-            from dossier.dossier_db import search_record
             return search_record("genuine", domain=self.domain)
         except Exception:
             return []

@@ -4,11 +4,13 @@ from questioners.exhaustion import ExhaustionTactic
 from questioners.temporal import TemporalQuestioner
 from questioners.panel import QuestionerPanel
 
+from questioners.neutral import NeutralQuestioner
+
 __all__ = [
     "Reframer",
     "AuthorityInvoker",
     "ExhaustionTactic",
     "TemporalQuestioner",
     "QuestionerPanel",
+    "NeutralQuestioner",
 ]
-from questioners.neutral import NeutralQuestioner

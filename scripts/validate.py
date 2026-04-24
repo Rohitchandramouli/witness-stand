@@ -6,6 +6,10 @@ Run: python scripts/validate.py  |  --fast for quick check on basic task only.
 import sys
 import json
 import argparse
+from tasks.registry import TASK_REGISTRY
+from models import WitnessAction, TurnType, Turn, Speaker
+from environment import WitnessStandEnv
+from transcript.store import TranscriptStore
 try:
     import yaml
 except ImportError:
@@ -39,7 +43,6 @@ def section(title: str) -> None:
 
 def check_registry():
     section("1  Task registry")
-    from tasks.registry import TASK_REGISTRY
     REQUIRED = ["basic", "intermediate", "advanced", "expert"]
     check(len(TASK_REGISTRY) == 4, "4 tasks registered",
           f"got {len(TASK_REGISTRY)}: {list(TASK_REGISTRY.keys())}")
@@ -58,7 +61,6 @@ EXPECTED = {
 
 def check_task_configs():
     section("2  Task configurations")
-    from tasks.registry import TASK_REGISTRY
     for name, expected in EXPECTED.items():
         if name not in TASK_REGISTRY:
             check(False, f"{name}: skipped (not in registry)")
@@ -110,7 +112,6 @@ def check_yaml():
 # ── 4: Environment interface ──────────────────────────────────────────
 
 def _dummy_action(response_text="My position stands.", flagged=False):
-    from models import WitnessAction
     return WitnessAction(
         response_text=response_text,
         flagged_distortion=flagged,
@@ -120,7 +121,6 @@ def _dummy_action(response_text="My position stands.", flagged=False):
 
 def check_env_interface(tasks=None):
     section("4  Environment interface (reset / step / grade)")
-    from environment import WitnessStandEnv
     targets = tasks or list(EXPECTED.keys())
     for task_name in targets:
         try:
@@ -155,7 +155,6 @@ def check_env_interface(tasks=None):
 
 def check_reward_bounds():
     section("5  Reward bounds")
-    from environment import WitnessStandEnv
     for task_name in ["basic", "expert"]:
         try:
             env = WitnessStandEnv()
@@ -181,7 +180,6 @@ def check_reward_bounds():
 
 def check_grader_determinism():
     section("6  Grader determinism")
-    from environment import WitnessStandEnv
     responses = [
         "My position stands. The evidence supports my original assessment.",
         "DISTORTION_DETECTED. That is not what I said.",
@@ -211,8 +209,6 @@ def check_grader_determinism():
 
 def check_transcript_lag():
     section("7  Transcript data lag")
-    from transcript.store import TranscriptStore
-    from models import Turn, Speaker, TurnType
 
     def make_turn(i):
         return Turn(turn_no=i, speaker=Speaker.WITNESS,
@@ -232,8 +228,6 @@ def check_transcript_lag():
 
 def check_panel_schedule():
     section("8  Questioner panel schedule")
-    from tasks.registry import TASK_REGISTRY
-    from models import TurnType
 
     INJECTION_TYPES = {
         TurnType.DISTORTION_INJECTION,

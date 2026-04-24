@@ -2,13 +2,8 @@
 Injection scheduler — decides which questioner fires at which turn.
 Configuration is per-task. Each task defines its injection schedule.
 """
-import random
-from typing import Dict, List, Optional, Type, Mapping
+from typing import List, Optional, Mapping
 from questioners.base import QuestionerBase
-from questioners.reframer import Reframer
-from questioners.authority import AuthorityInvoker
-from questioners.exhaustion import ExhaustionTactic
-from questioners.temporal import TemporalQuestioner
 from transcript.store import TranscriptStore
 from models import PersonaConfig, TurnType
 
@@ -35,11 +30,7 @@ class QuestionerPanel:
     ) -> str:
         questioner = self._schedule.get(turn_number, self._default)
         self._last_fired = questioner
-
-        # Let the TemporalQuestioner observe the full transcript before generating
-        if isinstance(questioner, TemporalQuestioner):
-            questioner.observe_transcript(transcript)
-
+        questioner.observe_transcript(transcript)  # no-op for non-temporal questioners
         return questioner.generate_turn(transcript, persona)
 
     def get_turn_type(self, turn_number: int) -> TurnType:

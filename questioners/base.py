@@ -21,6 +21,10 @@ class QuestionerBase(ABC):
         """No-op default. ExhaustionTactic overrides to track response length trends."""
         pass
 
+    def observe_transcript(self, transcript) -> None:
+        """No-op default. TemporalQuestioner overrides to build turn-claim map."""
+        pass
+
     def reset(self) -> None:
         pass
 

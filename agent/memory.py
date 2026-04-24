@@ -72,24 +72,6 @@ class EpisodicMemory:
                 return turn
         return None
 
-    def build_context_block(self, n: int = 5) -> str:
-        """
-        Builds a formatted string of the n most recent witness statements
-        for inclusion in the prompt. Format mirrors what a real expert
-        would recall — brief excerpts with turn references.
-        """
-        recent = self.get_recent(n)
-        if not recent:
-            return ""
-
-        lines = []
-        for turn in recent:
-            excerpt = turn.text[:150].strip()
-            if len(turn.text) > 150:
-                excerpt += "..."
-            lines.append(f"[Turn {turn.turn_no}] {excerpt}")
-
-        return "\n".join(lines)
 
     def find_claim(self, keyword: str) -> Optional[Turn]:
         """

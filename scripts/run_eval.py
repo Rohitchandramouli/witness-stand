@@ -23,6 +23,10 @@ from models import Turn, Speaker, TurnType
 from constants import WITNESS_MODEL, GROQ_API_BASE
 
 import os
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
 
 TASKS = ["basic", "intermediate", "advanced", "expert"]
 ROLLOUTS_PER_TASK = 1          # 1 rollout — avoids rate limit, still meaningful
@@ -40,7 +44,6 @@ def call_llm(system_prompt: str, user_prompt: str, retries: int = 3) -> str:
     if not api_key:
         return _heuristic_response(user_prompt)
 
-    from groq import Groq
     client = Groq(api_key=api_key)
 
     for attempt in range(retries):
