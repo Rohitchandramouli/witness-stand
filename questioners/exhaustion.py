@@ -54,14 +54,7 @@ class ExhaustionTactic(QuestionerBase):
         if not self._last_fired_tactic:
             return
 
-        if was_detected:
-            self._tactic_weights[self._last_fired_tactic] = max(
-                0.1, self._tactic_weights[self._last_fired_tactic] * 0.85
-            )
-        else:
-            self._tactic_weights[self._last_fired_tactic] = min(
-                5.0, self._tactic_weights[self._last_fired_tactic] * 1.20
-            )
+        self._tactic_weights[self._last_fired_tactic] = self._update_weight(self._tactic_weights[self._last_fired_tactic], was_detected)
 
     def observe_witness_response(self, response_text: str) -> None:
         """

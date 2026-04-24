@@ -123,6 +123,7 @@ class TaskExpert(TaskBase):
 
         # Now build the panel — _dossier is set so _build_panel can use it
         self._panel = self._build_panel()
+        self._persona_cache = self._build_persona()
 
     @staticmethod
     def _sample_domain_pair() -> Tuple[str, str]:

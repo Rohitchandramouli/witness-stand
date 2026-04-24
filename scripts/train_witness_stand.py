@@ -63,7 +63,6 @@ from agent.prompt import build_system_prompt, build_user_prompt
 from agent.parser import parse_action
 from agent.memory import EpisodicMemory
 from agent.heuristics import WitnessHeuristics
-from grader.episode_grader import score_episode
 from models import Turn, Speaker, TurnType
 
 
@@ -220,19 +219,7 @@ def run_episode(
         )
 
     heuristics.end_episode()
-    # Episode-level grading
-    reconstruction = prev_action.response_text if prev_action else ""
-    env.episode_log.per_turn_scores = per_turn_scores
-
-    final = score_episode(
-        log=env.episode_log,
-        transcript=env.transcript,
-        reconstruction=reconstruction,
-        contested_claims=info.get("contested_claims", []),
-        genuine_evidence_results=info.get("genuine_evidence_results", None),
-        key_claims=info.get("key_claims", []),
-    )
-    return final
+    return env.grade()
 
 
 # ══════════════════════════════════════════════════════════════════════

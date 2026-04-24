@@ -16,6 +16,10 @@ class TranscriptStore:
     def get_all(self) -> List[Turn]:
         return list(self._turns)
 
+    def turns(self) -> List[Turn]:
+        """Direct reference to internal turns list — no copy. Read-only use only.""";
+        return self._turns
+
     def get_witness_turns(self, exclude_recent: int = 0) -> List[Turn]:
         witness_turns = [t for t in self._turns if t.speaker == Speaker.WITNESS]
         lag = max(exclude_recent, self._data_lag_turns)

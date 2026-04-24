@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import sys
+import traceback
 import time
 from pathlib import Path
 
@@ -229,7 +230,6 @@ def main():
             results.append(bd)
         except Exception as e:
             print(f"\n  ✗ {task_name} raised: {e}")
-            import traceback
             traceback.print_exc()
 
     _print_summary(results)

@@ -59,22 +59,15 @@ class QuestionerPanel:
             self._last_fired.record_outcome(was_detected)
 
     def observe_witness_response(self, response_text: str) -> None:
-        """
-        Routes witness response text to ExhaustionTactic if it fired last.
-        ExhaustionTactic uses response length to decide when to escalate.
-        Called by environment.py after every witness turn.
-        """
-        if isinstance(self._last_fired, ExhaustionTactic):
+        """Forwards witness response to last-fired questioner (all implement the no-op base).""";
+        if self._last_fired is not None:
             self._last_fired.observe_witness_response(response_text)
 
     def reset(self) -> None:
         """Resets all questioners and clears last-fired state for a new episode."""
         self._last_fired = None
-        seen = set()
-        for questioner in list(self._schedule.values()) + [self._default]:
-            if id(questioner) not in seen:
-                questioner.reset()
-                seen.add(id(questioner))
+        for q in self.all_questioners():
+            q.reset()
 
     def all_questioners(self) -> List[QuestionerBase]:
         """Returns all unique questioner instances in this panel."""

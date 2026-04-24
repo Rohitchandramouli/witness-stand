@@ -396,16 +396,7 @@ def score_cross_turn_consistency(
     transcript: TranscriptStore,
     key_claims: List[str],
 ) -> float:
-    """
-    Episode-level drift score [0.0, 1.0].
-    Scans all witness turns and checks whether key claim language drifted.
-
-    For each key claim that appears in more than one witness turn:
-      +1.0  language stable across all turns
-      +0.6  minor variation, no substantive position change
-      +0.2  measurable framing drift
-      -0.3  committed position drifted to a different characterisation
-    """
+    """Episode-level drift [0.0, 1.0] — compares first vs last mention of each claim.""";
     witness_turns = transcript.get_witness_turns()
     if len(witness_turns) < 2 or not key_claims:
         return 1.0
@@ -413,23 +404,15 @@ def score_cross_turn_consistency(
     scores = []
     for claim in key_claims:
         claim_lower = claim.lower()
-        relevant_turns = [
-            t for t in witness_turns
-            if claim_lower[:15] in t.text.lower()
-        ]
-        if len(relevant_turns) < 2:
+        prefix = claim_lower[:15]
+        relevant = [t for t in witness_turns if prefix in t.text.lower()]
+        if len(relevant) < 2:
             continue
+        scores.append(_measure_drift_between(
+            relevant[0].text.lower(), relevant[-1].text.lower(), claim_lower
+        ))
 
-        first_text = relevant_turns[0].text.lower()
-        last_text = relevant_turns[-1].text.lower()
-
-        drift = _measure_drift_between(first_text, last_text, claim_lower)
-        scores.append(drift)
-
-    if not scores:
-        return 1.0
-
-    return max(0.0, sum(scores) / len(scores))
+    return max(0.0, sum(scores) / len(scores)) if scores else 1.0
 
 
 def score_reconstruction_completeness(

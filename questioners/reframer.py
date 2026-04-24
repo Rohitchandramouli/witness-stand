@@ -57,14 +57,7 @@ class Reframer(QuestionerBase):
         if not self._last_fired_type:
             return
 
-        if was_detected:
-            self._type_weights[self._last_fired_type] = max(
-                0.1, self._type_weights[self._last_fired_type] * 0.85
-            )
-        else:
-            self._type_weights[self._last_fired_type] = min(
-                5.0, self._type_weights[self._last_fired_type] * 1.20
-            )
+        self._type_weights[self._last_fired_type] = self._update_weight(self._type_weights[self._last_fired_type], was_detected)
 
     def generate_turn(self, transcript: TranscriptStore, persona: PersonaConfig) -> str:
         witness_turns = transcript.get_witness_turns()

@@ -60,16 +60,7 @@ class AuthorityInvoker(QuestionerBase):
             self._last_fired, "industry"
         )
 
-        if was_detected:
-            # Witness caught it — reduce weight for this authority type
-            self._type_weights[authority_type] = max(
-                0.1, self._type_weights[authority_type] * 0.85
-            )
-        else:
-            # Witness accepted it — increase weight for this authority type
-            self._type_weights[authority_type] = min(
-                5.0, self._type_weights[authority_type] * 1.20
-            )
+        self._type_weights[authority_type] = self._update_weight(self._type_weights[authority_type], was_detected)
 
     def generate_turn(self, transcript: TranscriptStore, persona: PersonaConfig) -> str:
         available = [

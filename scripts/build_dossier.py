@@ -1,22 +1,9 @@
 """
-scripts/build_dossier.py — one-time offline build pipeline.
-
-Fetches real documents from all four domain source URLs, runs a single
-LLM extraction pass per domain via Groq, and writes:
-
-  data/personas/<domain>.json     — synthesised persona system prompt
-  data/dossier.db                 — SQLite evidence archive with:
-                                      • documents table (real source text)
-                                      • distortions table (attack templates)
-                                      • information_states table (episode audit log)
-
-Run once before any training episode. Safe to re-run — overwrites existing
-persona JSONs and upserts into the database.
-
-Usage:
-    python scripts/build_dossier.py               # build all four domains
-    python scripts/build_dossier.py --domain financial  # build one domain
+One-time offline persona builder. Fetches real docs, synthesises expert personas,
+populates SQLite distortion DB. Run once before any training episode.
+Run: python scripts/build_dossier.py
 """
+
 
 import argparse
 import json
@@ -28,6 +15,12 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 import re
+import io
+import sqlite3
+try:
+    import PyPDF2
+except ImportError:
+    PyPDF2 = None
 import requests
 from dotenv import load_dotenv
 from groq import Groq
@@ -297,14 +290,12 @@ def _fetch_nist(url: str) -> Dict[str, Any]:
     extracts real text using PyPDF2 instead of decoding raw bytes.
     Requires: pip install PyPDF2
     """
-    import io
     resp = requests.get(url, timeout=_REQUEST_TIMEOUT, headers={"User-Agent": "Mozilla/5.0"})
     resp.raise_for_status()
 
     # Detect PDF by magic bytes, not Content-Type (servers lie)
     if resp.content[:4] == b"%PDF":
         try:
-            import PyPDF2
             reader = PyPDF2.PdfReader(io.BytesIO(resp.content))
             # Extract first 10 pages — enough for framework terminology
             text = ""
@@ -339,7 +330,6 @@ def _fetch_generic(url: str, domain: str) -> Dict[str, Any]:
     # Handle PDF content regardless of Content-Type header
     if resp.content[:4] == b"%PDF":
         try:
-            import io, PyPDF2
             reader = PyPDF2.PdfReader(io.BytesIO(resp.content))
             text = ""
             for i in range(min(10, len(reader.pages))):
@@ -371,7 +361,6 @@ def _insert_documents(domain: str, docs: List[Dict[str, Any]]) -> None:
     Inserts fetched documents into the dossier.db documents table.
     Uses INSERT OR REPLACE so re-running the build is safe.
     """
-    import sqlite3
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
@@ -412,7 +401,6 @@ def _insert_distortions(distortions: List[Dict[str, Any]]) -> None:
     Inserts generated distortion templates into dossier.db.
     Uses INSERT OR REPLACE so re-running is safe.
     """
-    import sqlite3
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 

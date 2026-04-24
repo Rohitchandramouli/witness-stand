@@ -1,27 +1,15 @@
 """
-OpenEnv spec compliance + pipeline health check.
-
-Tests:
-  1. Registry — all 4 tasks present
-  2. Task config — turns, lag, panel, persona per task
-  3. openenv.yaml — required keys, 4 tasks declared
-  4. Environment interface — reset/step/grade loop on every task
-  5. Reward bounds — all per-turn scores in [-1, 2], final in [0, 1]
-  6. Grader determinism — same episode = same score
-  7. Transcript lag — lag applied correctly for advanced/expert
-  8. Questioner panel — injection turns fire, neutral turns exist
-  9. Agent imports — all agent/ modules import cleanly
- 10. Logs directory — writable, JSON outputs readable if present
-
-Run:
-    python scripts/validate.py
-    python scripts/validate.py --fast   (episode loops on basic only)
-
-Exit 0 = all pass. Exit 1 = at least one failure.
+OpenEnv spec compliance + pipeline health check. 199 assertions across 10 checks.
+Run: python scripts/validate.py  |  --fast for quick check on basic task only.
 """
+
 import sys
 import json
 import argparse
+try:
+    import yaml
+except ImportError:
+    yaml = None
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -101,7 +89,6 @@ def check_yaml():
     if not yaml_path.exists():
         return
     try:
-        import yaml
         doc = yaml.safe_load(yaml_path.read_text())
     except Exception as e:
         check(False, "openenv.yaml parses cleanly", str(e))

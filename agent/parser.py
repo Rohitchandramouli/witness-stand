@@ -1,18 +1,8 @@
 """
-Parses raw LLM text output into a structured WitnessAction.
-Zero LLM calls — pure string analysis.
-
-The witness LLM produces free-form text. The parser extracts:
-  - response_text      : the witness's spoken response
-  - flagged_distortion : did the witness explicitly flag an attack?
-  - accepted_update    : did the witness accept a position update?
-  - tool_calls         : structured tool invocations found in the text
-  - reasoning_chain    : any <think>...</think> block (chain-of-thought)
-
-Design principle: permissive parsing with explicit fallbacks.
-A malformed response is still a response — parse what you can,
-default the rest to safe values (no flag, no update, no tools).
+Parses raw LLM output into WitnessAction. Zero LLM calls — pure string analysis.
+Extracts: response_text, flagged_distortion, accepted_update, tool_calls, reasoning_chain.
 """
+
 import re
 from typing import List, Dict, Any, Optional
 from models import WitnessAction

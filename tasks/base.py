@@ -23,6 +23,12 @@ class TaskBase(ABC):
         self._dossier: DossierBase = self._sample_dossier()
         self._persona_data: dict = load_persona(self._dossier.domain)
         self._panel: QuestionerPanel = self._build_panel()
+        self._persona_cache: PersonaConfig = self._build_persona()
+
+    def _build_persona(self) -> PersonaConfig:
+        config = self._dossier.get_persona_config()
+        config.system_prompt = self._persona_data["persona"].get("system_prompt", "")
+        return config
 
     # ── Episode-level sampling ────────────────────────────────────────
 
@@ -47,11 +53,7 @@ class TaskBase(ABC):
 
     @property
     def persona(self) -> PersonaConfig:
-        config = self._dossier.get_persona_config()
-        config.system_prompt = self._persona_data["persona"].get(
-            "system_prompt", ""
-        )
-        return config
+        return self._persona_cache
 
     @property
     def panel(self) -> QuestionerPanel:

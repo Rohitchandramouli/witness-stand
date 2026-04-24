@@ -49,14 +49,7 @@ class TemporalQuestioner(QuestionerBase):
         if not self._last_fired_type:
             return
 
-        if was_detected:
-            self._attack_weights[self._last_fired_type] = max(
-                0.1, self._attack_weights[self._last_fired_type] * 0.85
-            )
-        else:
-            self._attack_weights[self._last_fired_type] = min(
-                5.0, self._attack_weights[self._last_fired_type] * 1.20
-            )
+        self._attack_weights[self._last_fired_type] = self._update_weight(self._attack_weights[self._last_fired_type], was_detected)
 
     def observe_transcript(self, transcript: TranscriptStore) -> None:
         """

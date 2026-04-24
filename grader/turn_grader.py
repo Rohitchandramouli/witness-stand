@@ -1,17 +1,8 @@
 """
-Per-turn score computation.
-Aggregates the five per-turn check scores into a single reward signal.
-Fires after every witness response. Zero LLM calls.
-
-Final per-turn score formula:
-    score = (
-        W_detection     × score_detection()
-        W_first_turn    × score_first_turn_detection()
-        W_precision     × score_precision()
-        W_consistency   × score_consistency()
-        W_specificity   × score_specificity()
-    )
+Per-turn score computation. Fires after every witness response. Zero LLM calls.
+score = Σ(weight_i × check_i) across 5 independent turn checks.
 """
+
 from typing import Optional, List, TYPE_CHECKING
 
 from transcript.store import TranscriptStore

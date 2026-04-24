@@ -232,11 +232,7 @@ class WitnessStandEnv:
     # ── Private helpers ───────────────────────────────────────────────
 
     def _update_discrimination(self, action: WitnessAction) -> None:
-        last_q = next(
-            (t for t in reversed(self.transcript.get_all())
-             if t.speaker == Speaker.QUESTIONER),
-            None,
-        )
+        last_q = self.transcript.last_questioner_turn_obj()
         if last_q is None:
             return
 
