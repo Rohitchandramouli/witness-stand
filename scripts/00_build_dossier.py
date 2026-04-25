@@ -11,7 +11,7 @@ import os
 import sys
 import uuid
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 import re
 import io
@@ -584,113 +584,90 @@ def _generate_distortions(
     domain: str,
     docs: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """
-    Calls Groq once to generate distortion templates from the fetched documents.
-    Returns a list of distortion dicts ready for DB insertion.
-
-    Distortion types generated:
-      difficulty 1 — word_swap (direct word substitution)
-      difficulty 2 — qualifier_strip (remove hedging language)
-      difficulty 3 — attribution_error (misattribute source or conclusion)
-      difficulty 4 — threshold_substitution (change numeric thresholds)
-
-    Each distortion has:
-      original_claim   — exact text from source document
-      distorted_claim  — the modified version the questioner will present
-      detection_evidence — what the witness can cite to catch it
-    """
+    """Calls Groq to build distortion templates; falls back to deterministic set."""
     if not docs:
         return _fallback_distortions(domain)
+    raw = _call_groq_for_distortions(domain, docs)
+    if raw is None:
+        return _fallback_distortions(domain)
+    distortions = _build_distortion_records(domain, raw, docs)
+    return distortions or _fallback_distortions(domain)
 
-    # Concatenate source text for the prompt
+
+def _call_groq_for_distortions(
+    domain: str,
+    docs: List[Dict[str, Any]],
+) -> Optional[List[Dict]]:
+    """Returns parsed JSON list from Groq, or None on failure."""
     source_text = "\n\n---\n\n".join(
-        f"[{d.get('title', '')}]\n{d.get('body_text', '')[:800]}"
+        "[{}]\n{}".format(d.get("title", ""), d.get("body_text", "")[:800])
         for d in docs if d
     )[:_MAX_SOURCE_CHARS]
 
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-    prompt = f"""You are generating adversarial distortion templates for an AI training environment.
-
-Domain: {domain}
-Source documents:
-{source_text}
-
-Generate exactly {_DISTORTIONS_PER_DOC * max(len(docs), 2)} distortion templates from the above text.
-For each distortion, produce a JSON object with these fields:
-  - original_claim: an exact or near-exact quote from the source text (1-2 sentences)
-  - distorted_claim: a subtly modified version that changes the meaning
-  - distortion_type: one of [word_swap, qualifier_strip, attribution_error, threshold_substitution]
-  - difficulty: integer 1-4 (1=direct word change, 4=subtle threshold or attribution change)
-  - detection_evidence: what text from the source proves the distortion is wrong
-
-Return ONLY a valid JSON array. No preamble, no markdown, no explanation.
-Example entry:
-{{"original_claim": "The risk was assessed as moderate-to-elevated.", "distorted_claim": "The risk was assessed as low.", "distortion_type": "word_swap", "difficulty": 1, "detection_evidence": "Source states moderate-to-elevated, not low."}}"""
+    n = _DISTORTIONS_PER_DOC * max(len(docs), 2)
+    example = ('{"original_claim": "Risk was moderate-to-elevated.", '
+               '"distorted_claim": "Risk was low.", '
+               '"distortion_type": "word_swap", "difficulty": 1, '
+               '"detection_evidence": "Source states moderate-to-elevated."}')
+    prompt = (
+        "You are generating adversarial distortion templates for an AI training environment.\n\n"
+        "Domain: {}\nSource documents:\n{}\n\n"
+        "Generate exactly {} distortion templates. Return ONLY a valid JSON array.\n"
+        "Each object: original_claim, distorted_claim, distortion_type "
+        "(word_swap|qualifier_strip|attribution_error|threshold_substitution), "
+        "difficulty (1-4), detection_evidence.\nExample: {}"
+    ).format(domain, source_text, n, example)
 
     try:
+        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         resp = client.chat.completions.create(
             model=DEFAULT_WITNESS_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5,
             max_tokens=2000,
         )
-        content = resp.choices[0].message.content
-        if not content or not content.strip():
-            # Surface what Groq actually returned for debugging
-            print(f"        Debug: Groq returned empty content. "
-                  f"finish_reason={resp.choices[0].finish_reason}")
-            raise ValueError("Empty response from LLM")
-
-        # Strip all markdown and whitespace aggressively
-        content = content.strip()
-        # Remove ```json ... ``` or ``` ... ``` fences
-        content = re.sub(r'^```(?:json)?\s*', '', content, flags=re.MULTILINE)
-        content = re.sub(r'```\s*$', '', content, flags=re.MULTILINE)
-        content = content.strip()
-
-        # Find the JSON array — scan for first '[' if there's preamble
-        bracket_start = content.find('[')
-        bracket_end = content.rfind(']')
-        if bracket_start != -1 and bracket_end != -1:
-            content = content[bracket_start:bracket_end + 1]
-
-        raw = json.loads(content)
-
+        raw_text = (resp.choices[0].message.content or "").strip()
+        if not raw_text:
+            raise ValueError(f"Empty Groq response (finish_reason={resp.choices[0].finish_reason})")
+        raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text, flags=re.MULTILINE)
+        raw_text = re.sub(r"```\s*$", "", raw_text, flags=re.MULTILINE).strip()
+        start, end = raw_text.find("["), raw_text.rfind("]")
+        if start != -1 and end != -1:
+            raw_text = raw_text[start:end + 1]
+        return json.loads(raw_text)
     except Exception as e:
-        print(f"        Warning: LLM distortion generation failed ({e}). Using 9-template deterministic fallback.")
-        return _fallback_distortions(domain)
+        print(f"        Warning: LLM distortion generation failed ({e}). Using fallback.")
+        return None
 
-    # Attach doc references and IDs
+
+def _build_distortion_records(
+    domain: str,
+    raw: List[Dict],
+    docs: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Validates and enriches raw LLM distortion dicts with IDs and metadata."""
     distortions = []
     for i, item in enumerate(raw):
         if not isinstance(item, dict):
             continue
-        doc_idx = i % max(len(docs), 1)
-        source_doc_id = f"{domain.upper()}-DOC-{doc_idx+1:03d}"
-        original_claim = str(item.get("original_claim", "")).strip()
-        distorted_claim = str(item.get("distorted_claim", "")).strip()
-        detection_evidence = str(item.get("detection_evidence", "")).strip()
-
-        if not original_claim or not distorted_claim or not detection_evidence:
+        original  = str(item.get("original_claim", "")).strip()
+        distorted = str(item.get("distorted_claim", "")).strip()
+        evidence  = str(item.get("detection_evidence", "")).strip()
+        if not original or not distorted or not evidence:
             continue
-
-        difficulty = max(1, min(4, int(item.get("difficulty", 1))))
+        doc_idx = i % max(len(docs), 1)
+        src_id  = f"{domain.upper()}-DOC-{doc_idx+1:03d}"
         distortions.append({
-            "distortion_id":    f"{domain.upper()}-DIST-{i+1:04d}-{uuid.uuid4().hex[:6]}",
-            "source_doc_id":    source_doc_id,
-            "domain":           domain,
-            "distortion_type":  item.get("distortion_type", "word_swap"),
-            "original_claim": original_claim,
-            "distorted_claim": distorted_claim,
-            "detection_evidence": detection_evidence,
-            "difficulty": difficulty,
-            "requires_docs":    [source_doc_id],
+            "distortion_id":     f"{domain.upper()}-DIST-{i+1:04d}-{uuid.uuid4().hex[:6]}",
+            "source_doc_id":     src_id,
+            "domain":            domain,
+            "distortion_type":   item.get("distortion_type", "word_swap"),
+            "original_claim":    original,
+            "distorted_claim":   distorted,
+            "detection_evidence": evidence,
+            "difficulty":        max(1, min(4, int(item.get("difficulty", 1)))),
+            "requires_docs":     [src_id],
         })
-
-    if not distortions:
-        return _fallback_distortions(domain)
-
     return distortions
 
 

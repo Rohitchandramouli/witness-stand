@@ -10,7 +10,6 @@ from grader.turn_grader import score_turn
 from models import EpisodeLog, Speaker, Turn, TurnType, WitnessAction
 from tasks.base import TaskBase
 from tasks.registry import get_task
-from tasks.task_expert import TaskExpert
 from transcript.store import TranscriptStore
 
 
@@ -121,9 +120,11 @@ class WitnessStandEnv:
         self._update_discrimination(action)
         self._log_information_state(action)
 
-        if self._should_rotate_expert_domain() and isinstance(task, TaskExpert):
-            task.rotate_to_domain_b()
-            episode_log.domain = task.domain
+        if self._should_rotate_expert_domain():
+            rotate = getattr(task, "rotate_to_domain_b", None)
+            if callable(rotate):
+                rotate()
+                episode_log.domain = task.domain
 
         self._prev_action = action
         self._current_turn += 1
@@ -295,9 +296,8 @@ class WitnessStandEnv:
         )
 
     def _should_rotate_expert_domain(self) -> bool:
-        if not isinstance(self.task, TaskExpert):
+        if not hasattr(self.task, 'rotate_to_domain_b'):
             return False
-
         rotation_turn = getattr(self.task, "active_rotation_turn", 21)
         return self._current_turn == rotation_turn - 1
 
@@ -401,14 +401,14 @@ class WitnessStandEnv:
             raise RuntimeError("Environment is not initialised. Call reset() first.")
 
         return self.task, self.transcript, self.episode_log
-
+    
     @staticmethod
     def _dedupe_preserve_order(items: list[str]) -> list[str]:
         seen: set[str] = set()
         result: list[str] = []
 
         for item in items:
-            key = item.lower()
+            key = item.lower().strip()
             if key and key not in seen:
                 result.append(item)
                 seen.add(key)

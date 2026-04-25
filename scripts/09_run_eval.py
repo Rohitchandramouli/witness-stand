@@ -103,10 +103,13 @@ def run_task(task_name: str, rollouts: int, quiet: bool, seed: int) -> dict:
         heuristics = WitnessHeuristics()
 
         obs = env.reset(task_name, seed=seed + rollout_idx)
+        if env.task is None:
+            raise RuntimeError("Environment did not initialise task.")
+        task = env.task
         done = False
         last_domain = obs["domain"]
         last_attack_type = TurnType(obs.get("turn_type", TurnType.NEUTRAL.value))
-        system_prompt = build_system_prompt(env.task.persona, last_attack_type, heuristics)
+        system_prompt = build_system_prompt(task.persona, last_attack_type, heuristics)
 
         if not quiet:
             print(f"    rollout {rollout_idx + 1}/{rollouts} domain={obs['domain']}")
@@ -116,7 +119,7 @@ def run_task(task_name: str, rollouts: int, quiet: bool, seed: int) -> dict:
             if obs["domain"] != last_domain or attack_type != last_attack_type:
                 last_domain = obs["domain"]
                 last_attack_type = attack_type
-                system_prompt = build_system_prompt(env.task.persona, attack_type, heuristics)
+                system_prompt = build_system_prompt(task.persona, attack_type, heuristics)
 
             user_prompt = build_user_prompt(
                 obs["questioner_text"],

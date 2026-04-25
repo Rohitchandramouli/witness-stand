@@ -82,14 +82,20 @@ def run_episode(task_name: str, max_turns: Optional[int], verbose: bool) -> dict
         turn += 1
 
     reconstruction = env._prev_action.response_text if env._prev_action else ""
+    if env.episode_log is None or env.transcript is None or env.task is None:
+        raise RuntimeError("Environment was not initialised correctly.")
+    episode_log = env.episode_log
+    transcript = env.transcript
+    task = env.task
+
     breakdown = score_episode_breakdown(
-        log=env.episode_log,
-        transcript=env.transcript,
+        log=episode_log,
+        transcript=transcript,
         reconstruction=reconstruction,
         contested_claims=env._contested_claims,
         genuine_evidence_results=env._discrimination_dict(),
-        key_claims=env._key_claims(env.task),
-    )
+        key_claims=env._key_claims(task),
+)
 
     breakdown["task_name"] = task_name
     breakdown["domain"] = obs["domain"]

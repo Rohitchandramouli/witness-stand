@@ -80,3 +80,14 @@ class EpisodeLog:
     per_turn_scores: List[float] = field(default_factory=list)
     episode_score: float = 0.0
     final_score: float = 0.0
+
+def dedupe_preserve_order(items: list) -> list:
+    """Deduplicates a list preserving first-seen order. Case-insensitive for strings."""
+    seen: set = set()
+    result = []
+    for item in items:
+        key = item.lower() if isinstance(item, str) else item
+        if key not in seen:
+            result.append(item)
+            seen.add(key)
+    return result

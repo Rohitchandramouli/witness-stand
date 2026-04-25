@@ -10,6 +10,8 @@ import importlib
 import json
 import os
 import sys
+print("Python path:", sys.executable)
+
 from pathlib import Path
 from typing import Any
 

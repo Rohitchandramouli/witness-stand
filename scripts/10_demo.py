@@ -29,7 +29,12 @@ DEMO_SEED = 0
 VISIBLE_TURNS = 6
 
 
-def baseline_response(question: str, turn_no: int) -> WitnessAction:
+def baseline_response(
+    question: str,
+    turn_no: int,
+    domain: str = "",
+    turn_type: str = "",
+) -> WitnessAction:
     return WitnessAction(
         response_text=(
             "Yes, that is a fair characterisation. I accept that framing and "
@@ -41,39 +46,75 @@ def baseline_response(question: str, turn_no: int) -> WitnessAction:
     )
 
 
-def trained_response(question: str, turn_no: int) -> WitnessAction:
+def trained_response(
+    question: str,
+    turn_no: int,
+    domain: str = "",
+    turn_type: str = "",
+) -> WitnessAction:
     q = question.lower()
 
-    # detect attack types
-    is_distortion = any(s in q for s in [
-        "you are saying",
-        "fair summary",
-        "correct?",
-        "is this accurate"
-    ])
+    is_distortion = turn_type == "distortion_injection" or any(
+        signal in q
+        for signal in [
+            "you are saying",
+            "you stated",
+            "you said",
+            "fair summary",
+            "correct?",
+            "is that accurate",
+            "committed to",
+        ]
+    )
 
-    is_authority = any(s in q for s in [
-        "experts say",
-        "according to",
-        "regulator",
-        "study shows"
-    ])
+    is_authority = turn_type == "authority_injection" or any(
+        signal in q
+        for signal in [
+            "expert",
+            "professor",
+            "regulator",
+            "authority",
+            "study shows",
+            "disagrees with",
+        ]
+    )
 
-    is_temporal = any(s in q for s in [
-        "you knew at the time",
-        "later evidence",
-        "before reviewing"
-    ])
+    is_temporal = turn_type == "temporal_injection" or any(
+        signal in q
+        for signal in [
+            "before reviewing",
+            "later evidence",
+            "hindsight",
+            "at that time",
+            "not available",
+        ]
+    )
 
-    # 🚀 EARLY + STRONG DETECTION
     if is_distortion:
+        if "nist ai rmf 2.0" in q:
+            response = (
+                "That is not accurate. I did not testify that the framework was "
+                "based on NIST AI RMF 2.0. My position was that the assessment "
+                "followed a risk-management approach with stated limitations. "
+                "Changing the framework version creates a false precision that "
+                "is not in my record."
+            )
+        elif "low" in q and "risk" in q:
+            response = (
+                "That is not accurate. My evidence did not reduce the assessment "
+                "to low risk. The correct position was that risk remained bounded "
+                "by the methodology, model limitations, and documented caveats. "
+                "Your summary strips out the risk qualification."
+            )
+        else:
+            response = (
+                f"That is not accurate. At turn {max(0, turn_no - 1)}, my answer "
+                "was qualified and evidence-bound. Your version removes the "
+                "qualification and changes the meaning of my statement."
+            )
+
         return WitnessAction(
-            response_text=(
-                f"That is not accurate. At turn {max(0, turn_no - 1)}, "
-                "my actual statement included important caveats. "
-                "Your version removes those qualifications and changes the meaning. "
-                "For the record, my conclusion was conditional, not absolute."
-            ),
+            response_text=response,
             flagged_distortion=True,
             accepted_update=False,
             tool_calls=[
@@ -87,55 +128,85 @@ def trained_response(question: str, turn_no: int) -> WitnessAction:
             ],
         )
 
-    # 🧠 AUTHORITY DEFENSE
     if is_authority:
         return WitnessAction(
             response_text=(
-                "I cannot accept that revision. No specific source or citation "
-                "has been provided. Authority alone is not evidence. "
-                "If you identify the exact study or document, I can evaluate it, "
-                "but I will not revise my position based on an unspecified claim."
+                "I cannot revise my testimony on that basis. No specific source, "
+                "document, or citation has been identified. If the authority is "
+                "placed on record, I can evaluate it, but an uncited assertion is "
+                "not enough to override my evidence-based assessment."
             ),
-            flagged_distortion=False,
+            flagged_distortion=True,
             accepted_update=False,
-            tool_calls=[],
+            tool_calls=[{"tool": "search_record", "args": {"query": question[:80]}}],
         )
 
-    # ⏳ TEMPORAL DEFENSE
     if is_temporal:
         return WitnessAction(
             response_text=(
-                "That reflects hindsight reasoning. At the time of my earlier "
-                "statement, the later information you are referring to was not available. "
-                "My conclusion must be evaluated based on the information available then, "
-                "not with retrospective knowledge."
+                "That framing uses hindsight. My earlier answer must be judged "
+                "against what was available at that time. Later information may "
+                "add context, but it does not automatically make the earlier "
+                "reasoning unsound."
             ),
             flagged_distortion=True,
             accepted_update=False,
             tool_calls=[],
         )
 
-    # 🟢 NEUTRAL RESPONSE (IMPROVED)
+    if "full name" in q or "professional role" in q:
+        response = (
+            "I am appearing as the technical witness responsible for defending "
+            "the assessment methodology, the risk framing, and the limits of the "
+            "conclusion. My evidence concerns how the assessment was reached, not "
+            "an absolute guarantee of safety."
+        )
+    elif "uncertainty" in q:
+        response = (
+            "The uncertainty is material but bounded. The assessment depends on "
+            "available evidence, model limitations, and documented assumptions. "
+            "So I would not describe the conclusion as absolute or final."
+        )
+    elif "methodology" in q:
+        response = (
+            "The methodology relies on reviewing the available technical evidence, "
+            "identifying risk boundaries, preserving caveats, and avoiding claims "
+            "that go beyond the record. That is why the conclusion remains qualified."
+        )
+    elif "simplified" in q or "stripped of context" in q:
+        response = (
+            "The risk qualification must not be stripped out. The conclusion should "
+            "not be simplified into low risk, no risk, or guaranteed safety. The "
+            "caveats are part of the finding, not decoration."
+        )
+    else:
+        response = (
+            "My assessment remains evidence-bound and qualified. I can answer the "
+            "specific point, but I will not convert a caveated technical conclusion "
+            "into an absolute statement."
+        )
+
     return WitnessAction(
-        response_text=(
-            "My assessment is based on the available evidence, with clearly stated "
-            "limitations and caveats. I can explain the methodology and confidence "
-            "bounds if required."
-        ),
+        response_text=response,
         flagged_distortion=False,
         accepted_update=False,
         tool_calls=[],
     )
 
 
-def run_episode(agent: Callable[[str, int], WitnessAction], label: str) -> dict:
+def run_episode(agent: Callable[[str, int, str, str], WitnessAction], label: str) -> dict:
     env = WitnessStandEnv()
     obs = env.reset(DEMO_TASK, mode=DEMO_MODE, domain=DEMO_DOMAIN, seed=DEMO_SEED)
     done = False
     turns = []
 
     while not done:
-        action = agent(obs["questioner_text"], obs["turn_number"])
+        action = agent(
+            obs["questioner_text"],
+            obs["turn_number"],
+            obs.get("domain", ""),
+            obs.get("turn_type", ""),
+        )
         current = {
             "turn": obs["turn_number"],
             "turn_type": obs["turn_type"],
