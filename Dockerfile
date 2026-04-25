@@ -16,12 +16,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt pyproject.toml README.md ./
 
-RUN uv python -m pip install --upgrade pip \
+RUN python -m pip install --upgrade pip \
     && pip install -r requirements.txt
 
 COPY . .
 
-RUN uv pip install -e . \
+RUN pip install -e . \
     && mkdir -p data/personas logs/health logs/episodes logs/eval logs/training
 
 # Do not build the dossier at Docker build time because HF secrets are not
