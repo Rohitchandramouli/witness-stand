@@ -18,24 +18,21 @@ from constants import PERSONAS_DIR, WITNESS_MODEL
 load_dotenv()
 
 
-def build_persona(dossier_class: Type[DossierBase]) -> Dict[str, Any]:
-    """
-    Builds and saves a complete persona system prompt for a given dossier domain.
-    Fetches real documents from source_urls, runs LLM extraction to synthesise
-    identity + domain knowledge + position memory into a system prompt.
-    Output saved to data/personas/<domain>.json (gitignored).
-    Runs once offline before any training episode begins.
-    """
+def build_persona(
+    dossier_class: Type[DossierBase],
+    raw_documents: str | None = None,
+) -> Dict[str, Any]:
+    """Builds and saves a complete persona prompt for one dossier domain."""
     PERSONAS_DIR.mkdir(parents=True, exist_ok=True)
 
     dossier = dossier_class()
     config = dossier.get_persona_config()
-    output_path = PERSONAS_DIR / f"{dossier.domain}.json"
 
-    raw_documents = _fetch_documents(dossier)
-    system_prompt = _synthesise_persona(config, raw_documents)
+    if raw_documents is None:
+        raw_documents = _fetch_documents(dossier)
 
-    config.system_prompt = system_prompt
+    config.system_prompt = _synthesise_persona(config, raw_documents)
+
     output = {
         "domain": dossier.domain,
         "persona": {
@@ -47,10 +44,11 @@ def build_persona(dossier_class: Type[DossierBase]) -> Dict[str, Any]:
             "specialisation": config.specialisation,
             "professional_philosophy": config.professional_philosophy,
             "system_prompt": config.system_prompt,
-        }
+        },
     }
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    output_path = PERSONAS_DIR / f"{dossier.domain}.json"
+    with output_path.open("w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
     print(f"  Built persona: {dossier.domain} -> {output_path}")

@@ -1,101 +1,131 @@
-"""
-Episodic memory for the witness agent.
-Stores the witness's own responses by recency rank rather than absolute
-turn index — encodes transferable strategy rather than episode-specific
-artifacts. Rank 0 = most recent, rank 1 = second most recent, etc.
+"""Episodic witness memory.
 
-The data lag mechanic is enforced by TranscriptStore, not here.
-Memory is the agent's own internal recall of what it said —
-separate from what the transcript shows it.
+Stores only the witness's own statements. The official courtroom record lives
+in TranscriptStore; this memory is the witness's internal recall.
 """
-from typing import List, Optional, Dict, Any
-from models import Turn, Speaker
+
+import re
+from typing import List, Optional, Tuple
+
+from models import Speaker, Turn
+
+
+_STOPWORDS = {
+    "the", "a", "an", "and", "or", "but", "if", "then", "that", "this",
+    "there", "their", "with", "from", "into", "about", "your", "you",
+    "was", "were", "is", "are", "be", "been", "being", "for", "to", "of",
+    "in", "on", "at", "by", "as", "it", "my", "i", "we", "our",
+}
 
 
 class EpisodicMemory:
-    """
-    Stores and retrieves the witness's own prior statements.
+    """Stores and retrieves witness statements within one episode."""
 
-    Design decisions:
-    - Stores Turn objects in chronological order internally
-    - Exposes them by recency rank for prompt construction
-    - Persists across turns within an episode, resets between episodes
-    - Never stores questioner turns — only witness statements
-    """
-
-    def __init__(self, max_turns: int = 40):
+    def __init__(self, max_turns: int = 40) -> None:
         self._turns: List[Turn] = []
-        self._max_turns = max_turns
+        self._max_turns = max(1, max_turns)
 
     def store(self, turn: Turn) -> None:
-        """
-        Stores a witness turn in memory.
-        Silently ignores non-witness turns — memory is self-referential.
-        """
+        """Stores only witness turns."""
         if turn.speaker != Speaker.WITNESS:
             return
+
         self._turns.append(turn)
-        # Trim to max capacity — oldest turns dropped first
+
         if len(self._turns) > self._max_turns:
             self._turns = self._turns[-self._max_turns:]
 
     def get_by_rank(self, rank: int) -> Optional[Turn]:
-        """
-        Returns the witness turn at recency rank.
-        Rank 0 = most recent, rank 1 = second most recent, etc.
-        Returns None if rank exceeds available turns.
-        """
-        if not self._turns or rank >= len(self._turns):
+        """Rank 0 = most recent, rank 1 = second most recent."""
+        if rank < 0 or rank >= len(self._turns):
             return None
-        # Reverse index: rank 0 maps to [-1], rank 1 to [-2], etc.
         return self._turns[-(rank + 1)]
 
     def get_recent(self, n: int = 3) -> List[Turn]:
-        """
-        Returns the n most recent witness turns, newest last.
-        Used by prompt.py to build the recent-context window.
-        """
-        return self._turns[-n:] if self._turns else []
+        """Returns the n most recent witness turns, chronological order."""
+        if n <= 0:
+            return []
+        return list(self._turns[-n:])
 
     def get_all(self) -> List[Turn]:
-        """Returns all stored witness turns in chronological order."""
+        """Returns all witness turns in chronological order."""
         return list(self._turns)
 
     def get_by_turn_no(self, turn_no: int) -> Optional[Turn]:
-        """
-        Returns a specific turn by its original turn number.
-        Used during audit reconstruction to retrieve what was said at
-        a specific turn without relying on the lagged transcript.
-        """
+        """Returns a witness statement by original turn number."""
         for turn in reversed(self._turns):
             if turn.turn_no == turn_no:
                 return turn
         return None
 
-
     def find_claim(self, keyword: str) -> Optional[Turn]:
+        """Returns the most recent turn matching a keyword or phrase."""
+        matches = self.find_claims(keyword, top_k=1)
+        return matches[0] if matches else None
+
+    def find_claims(self, query: str, top_k: int = 3) -> List[Turn]:
         """
-        Searches memory for a turn containing a keyword.
-        Used by the witness when it needs to locate what it said
-        about a specific topic to construct a precise correction.
-        Returns the most recent matching turn.
+        Returns best matching witness turns for a query.
+
+        Uses deterministic token overlap, not embeddings, so it is fast,
+        offline, reproducible, and suitable for the hackathon environment.
         """
-        keyword_lower = keyword.lower()
-        for turn in reversed(self._turns):
-            if keyword_lower in turn.text.lower():
-                return turn
-        return None
+        if not query or not query.strip():
+            return []
+
+        query_tokens = self._tokens(query)
+        if not query_tokens:
+            return []
+
+        scored: List[Tuple[float, int, Turn]] = []
+
+        for idx, turn in enumerate(self._turns):
+            turn_tokens = self._tokens(turn.text)
+            if not turn_tokens:
+                continue
+
+            overlap = query_tokens & turn_tokens
+            if not overlap:
+                continue
+
+            score = len(overlap) / max(len(query_tokens), 1)
+
+            # Slightly prefer recent turns when overlap ties.
+            recency_bonus = idx / max(len(self._turns), 1) * 0.05
+            scored.append((score + recency_bonus, turn.turn_no, turn))
+
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return [turn for _, _, turn in scored[:top_k]]
+
+    def summary(self, max_chars_per_turn: int = 160) -> str:
+        """Returns a compact memory summary for debugging/demo."""
+        if not self._turns:
+            return "(No witness statements stored.)"
+
+        lines = []
+        for turn in self._turns:
+            text = " ".join(turn.text.split())
+            if len(text) > max_chars_per_turn:
+                text = text[:max_chars_per_turn].rstrip() + "..."
+            lines.append(f"[Turn {turn.turn_no}] {text}")
+
+        return "\n".join(lines)
 
     def reset(self) -> None:
-        """Clears all stored turns. Called at episode start."""
+        """Clears episode memory."""
         self._turns = []
 
     def __len__(self) -> int:
         return len(self._turns)
 
     def __repr__(self) -> str:
-        return (
-            f"EpisodicMemory("
-            f"turns={len(self._turns)}, "
-            f"max={self._max_turns})"
-        )
+        return f"EpisodicMemory(turns={len(self._turns)}, max={self._max_turns})"
+
+    @staticmethod
+    def _tokens(text: str) -> set[str]:
+        raw_tokens = re.findall(r"[a-zA-Z0-9][a-zA-Z0-9\-']+", text.lower())
+        return {
+            token
+            for token in raw_tokens
+            if len(token) > 2 and token not in _STOPWORDS
+        }

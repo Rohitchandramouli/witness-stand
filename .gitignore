@@ -1,39 +1,39 @@
-# ── Generated dossier artifacts (rebuilt at container startup) ─
-data/
-data/dossier.db
-data/personas/
-data/distortions/
+# ── Secrets ───────────────────────────────────────────
+.env
+.env.*
+!.env.example
+secrets.json
 
-# ── Logs ───────────────────────────────────────────────────────
+# ── Runtime data and generated artifacts ──────────────
+data/
 logs/
 *.log
 
-# ── Secrets ────────────────────────────────────────────────────
-.env
-.env.local
-secrets.json
-
-# ── Python ─────────────────────────────────────────────────────
+# ── Python ────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 .venv/
 venv/
+.envrc
+
+# ── Build / packaging ─────────────────────────────────
 *.egg-info/
 dist/
 build/
+site/
+.pytest_cache/
+.coverage
+htmlcov/
 
-# ── OS ─────────────────────────────────────────────────────────
+# ── OS / editor ───────────────────────────────────────
 .DS_Store
 Thumbs.db
-
-# ── Editor ─────────────────────────────────────────────────────
 .vscode/settings.json
 *.swp
 *.swo
 
-# ── Test artifacts ─────────────────────────────────────────────
-.pytest_cache/
-htmlcov/
-.coverage
+# ── Local archives / exports ──────────────────────────
 witness_stand.zip
+*.zip

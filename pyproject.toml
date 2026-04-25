@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "witness_stand"
 version = "1.0.0"
-description = "OpenEnv adversarial witness RL environment — Meta PyTorch × HuggingFace Hackathon 2026"
+description = "OpenEnv adversarial witness RL environment for epistemic integrity under cross-examination"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
 authors = [
-    { name = "Rohit Chandramouli",  email = "rohitchandramouli12@gmail.com" },
-    { name = "Subhashree Mahimaa",  email = "subhashreemahimaa@gmail.com" },
-    { name = "Sahana Srinivasan",   email = "ssahana1608@gmail.com" },
+    { name = "Rohit Chandramouli", email = "rohitchandramouli12@gmail.com" },
+    { name = "Subhashree Mahimaa", email = "subhashreemahimaa@gmail.com" },
+    { name = "Sahana Srinivasan", email = "ssahana1608@gmail.com" }
 ]
 keywords = [
     "reinforcement-learning",
@@ -21,22 +21,29 @@ keywords = [
     "llm",
     "multi-agent",
     "epistemic-integrity",
+    "deterministic-reward"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
 ]
 
 [project.urls]
-Repository   = "https://github.com/Rohitchandramouli/witness-stand"
-"HF Space"   = "https://huggingface.co/spaces/therubberduckdebuggers/witness-stand"
+Repository = "https://github.com/Rohitchandramouli/witness-stand"
+"HF Space" = "https://huggingface.co/spaces/therubberduckdebuggers/witness-stand"
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["*.egg-info", "data*", "logs*", "scripts*"]
+exclude = [
+    "data*",
+    "logs*",
+    "dist*",
+    "build*",
+    "*.egg-info*"
+]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.json"]

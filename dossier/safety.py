@@ -1,20 +1,20 @@
-"""
-Safety engineer dossier.
-Real sources: NTSB incident reports, BIS standards, OISD safety bulletins.
-"""
+"""Safety engineer dossier."""
+
+from typing import ClassVar, List
+
 from dossier.base import DossierBase
 from models import PersonaConfig
-from typing import List, Dict
 
 
 class SafetyDossier(DossierBase):
-    domain = "safety"
-    source_urls = [
-    "https://www.ntsb.gov/investigations/AccidentReports/Pages/Reports.aspx",
-    "https://data.ntsb.gov/avdata",
-    "https://dgfasli.gov.in",
+    domain: ClassVar[str] = "safety"
+
+    source_urls: ClassVar[List[str]] = [
+        "https://www.ntsb.gov/investigations/AccidentReports/Pages/Reports.aspx",
+        "https://data.ntsb.gov/avdata",
+        "https://dgfasli.gov.in",
     ]
-    
+
     def get_persona_config(self) -> PersonaConfig:
         return PersonaConfig(
             domain=self.domain,
@@ -29,30 +29,12 @@ class SafetyDossier(DossierBase):
                 "incident investigation and root cause analysis",
             ],
             professional_philosophy=(
-                "An RPN score is not a judgment — it is a calculation. "
+                "An RPN score is not a judgment; it is a calculation. "
                 "The inputs must be defensible, not convenient. When someone "
                 "asks me to revise a severity rating downward without new "
                 "evidence, I treat that as a request to falsify a record."
             ),
         )
-
-
-    def get_distortion_templates(self) -> List[Dict]:
-        """
-        Returns distortion templates for this domain.
-        Loads from SQLite DB if available (populated by build_dossier.py).
-        Falls back to empty list only if DB has no entries — in that case
-        the Reframer falls back to transcript-based distortions.
-        """
-        try:
-            # Load all difficulty levels — tasks filter by their own pool
-            rows = get_distortions_for_domain(self.domain, [1, 2, 3, 4])
-            if rows:
-                return rows
-        except Exception:
-            pass
-        return []
-
 
     def get_false_authority_pool(self) -> List[str]:
         return [
@@ -63,14 +45,3 @@ class SafetyDossier(DossierBase):
             "Prof. Arun Chatterjee, IIT Kharagpur Industrial Safety",
             "Dr. Vikram Sood, NTPC Safety Directorate",
         ]
-
-
-    def get_genuine_evidence(self) -> List[Dict]:
-        """
-        Returns genuine evidence records for this domain from the DB.
-        Used for the symmetric discrimination mechanic.
-        """
-        try:
-            return search_record("genuine", domain=self.domain)
-        except Exception:
-            return []

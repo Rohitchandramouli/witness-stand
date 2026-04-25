@@ -9,7 +9,6 @@ import argparse
 import json
 import os
 import sys
-import time
 import uuid
 from pathlib import Path
 from typing import List, Dict, Any
@@ -17,10 +16,7 @@ from typing import List, Dict, Any
 import re
 import io
 import sqlite3
-try:
-    import PyPDF2
-except ImportError:
-    PyPDF2 = None
+from PyPDF2 import PdfReader
 import requests
 from dotenv import load_dotenv
 from groq import Groq
@@ -32,7 +28,7 @@ from dossier import DOSSIER_REGISTRY
 from dossier.base import DossierBase
 from dossier.dossier_db import init_db
 from dossier.persona_builder import build_persona
-from constants import DB_PATH, PERSONAS_DIR, WITNESS_MODEL
+from constants import DB_PATH, PERSONAS_DIR, DEFAULT_WITNESS_MODEL
 
 load_dotenv()
 
@@ -40,14 +36,14 @@ load_dotenv()
 _REQUEST_TIMEOUT = 15      # seconds per HTTP fetch
 _MAX_SOURCE_CHARS = 6000   # chars of source text fed to LLM per domain
 _DISTORTIONS_PER_DOC = 3   # distortion templates generated per document
-_DIFFICULTIES = [1, 2, 3, 4]
 
+_HEADERS = {"User-Agent": "Mozilla/5.0 WitnessStand/1.0"}
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Build Witness Stand dossiers")
     parser.add_argument(
         "--domain",
@@ -85,36 +81,167 @@ def main():
 #  PER-DOMAIN BUILD
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_domain(dossier_class) -> None:
+def _docs_to_persona_source(docs: List[Dict[str, Any]]) -> str:
+    """Converts already-fetched documents into persona-builder source text."""
+    return "\n\n---\n\n".join(
+        f"[Source: {doc.get('url', '')}]\n{doc.get('body_text', '')[:5000]}"
+        for doc in docs
+        if doc
+    )[:_MAX_SOURCE_CHARS]
+
+def _fallback_document(domain: str) -> Dict[str, Any]:
+    """Creates a minimal fallback document so fallback distortions always have evidence."""
+    return {
+        "url": "local:fallback",
+        "title": f"{domain.title()} fallback evidence record",
+        "body_text": (
+            f"The {domain} assessment indicated moderate risk. "
+            "Findings were preliminary and subject to further review. "
+            "The panel recommended further investigation. "
+            "The threshold was set at 0.05 significance level."
+        ),
+        "doc_type": "fallback",
+        "authored_date": "2024-01-01",
+    }
+
+def _clear_domain_records(domain: str) -> None:
+        """Clears old documents and distortions for a domain before rebuilding."""
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+
+        c.execute("DELETE FROM distortions WHERE domain = ?", (domain,))
+        c.execute("DELETE FROM documents WHERE domain = ?", (domain,))
+
+        conn.commit()
+        conn.close()
+
+def _build_domain(dossier_class: type[DossierBase]) -> None:
     """
     Full build pipeline for one domain:
       1. Fetch documents from source URLs
-      2. Synthesise persona via LLM (build_persona)
+      2. Synthesise persona via LLM
       3. Insert documents into dossier.db
       4. Generate distortion templates via LLM
       5. Insert distortions into dossier.db
     """
+
+
     dossier: DossierBase = dossier_class()
     domain = dossier.domain
+    _clear_domain_records(domain)
 
-    # Step 1 — fetch raw documents
+
     print(f"  [1/4] Fetching documents from {len(dossier.source_urls)} sources...")
     raw_docs = _fetch_all_sources(dossier)
     print(f"        Fetched {len(raw_docs)} document(s).")
 
-    # Step 2 — build persona JSON (calls Groq once)
-    print(f"  [2/4] Synthesising persona via LLM...")
-    build_persona(dossier_class)   # writes data/personas/<domain>.json
+    if not raw_docs:
+        raw_docs = [_fallback_document(domain)]
+        print("        No documents fetched. Added fallback document.")
 
-    # Step 3 — insert documents into DB
+    print(f"  [2/4] Synthesising persona via LLM...")
+    build_persona(dossier_class, raw_documents=_docs_to_persona_source(raw_docs))
+
     print(f"  [3/4] Inserting documents into dossier.db...")
     _insert_documents(domain, raw_docs)
 
-    # Step 4 — generate distortion templates
     print(f"  [4/4] Generating distortion templates...")
     distortions = _generate_distortions(domain, raw_docs)
     _insert_distortions(distortions)
     print(f"        Generated {len(distortions)} distortion template(s).")
+
+
+
+def _extract_pdf_text(content: bytes, max_pages: int = 10, max_chars: int = 5000) -> str:
+    """Extracts text from PDF bytes using PyPDF2."""
+    try:
+        reader = PdfReader(io.BytesIO(content))
+        text_parts = []
+
+        for page in reader.pages[:max_pages]:
+            page_text = page.extract_text() or ""
+            text_parts.append(page_text)
+
+            if sum(len(part) for part in text_parts) >= max_chars:
+                break
+
+        text = "\n".join(text_parts).strip()
+        if not text:
+            raise ValueError("PDF text extraction returned empty")
+
+        return text[:max_chars]
+
+    except Exception as exc:
+        raise RuntimeError(f"PDF could not be parsed: {exc}") from exc
+
+
+def _response_to_text(resp: requests.Response, max_chars: int = 5000) -> str:
+    """Returns clean readable text from an HTTP response, handling PDFs and HTML."""
+    if resp.content[:4] == b"%PDF":
+        return _extract_pdf_text(resp.content, max_chars=max_chars)
+
+    return _clean_html_text(resp.text, max_chars=max_chars)
+
+def _clean_html_text(raw_text: str, max_chars: int = 5000) -> str:
+    """Aggressively cleans HTML/JS/CSS noise into readable plain text."""
+    if not raw_text:
+        return ""
+
+    text = raw_text
+
+    # Remove scripts, styles, comments, SVGs, and common hidden blocks
+    text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
+    text = re.sub(r"<script.*?>.*?</script>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<style.*?>.*?</style>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<svg.*?>.*?</svg>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<noscript.*?>.*?</noscript>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+
+    # Convert common separators before removing tags
+    text = re.sub(r"</(p|div|li|tr|h1|h2|h3|h4|h5|h6)>", ". ", text, flags=re.IGNORECASE)
+    text = re.sub(r"<br\s*/?>", ". ", text, flags=re.IGNORECASE)
+
+    # Remove remaining tags
+    text = re.sub(r"<[^>]+>", " ", text)
+
+    # Decode common HTML entities manually
+    replacements = {
+        "&nbsp;": " ",
+        "&amp;": "&",
+        "&raquo;": "»",
+        "&laquo;": "«",
+        "&quot;": '"',
+        "&#39;": "'",
+        "&rsquo;": "'",
+        "&lsquo;": "'",
+        "&ldquo;": '"',
+        "&rdquo;": '"',
+        "&ndash;": "-",
+        "&mdash;": "-",
+    }
+
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    # Remove obvious asset/code fragments
+    noise_patterns = [
+        r"\bfunction\s*\([^)]*\)\s*\{.*?\}",
+        r"\bvar\s+[A-Za-z0-9_$]+\s*=.*?;",
+        r"\bconst\s+[A-Za-z0-9_$]+\s*=.*?;",
+        r"\blet\s+[A-Za-z0-9_$]+\s*=.*?;",
+        r"https?://\S+\.(png|jpg|jpeg|gif|svg|css|js)",
+        r"\bSP\.SOD\b.*?",
+        r"\bWebResource\.axd\b.*?",
+    ]
+
+    for pattern in noise_patterns:
+        text = re.sub(pattern, " ", text, flags=re.DOTALL | re.IGNORECASE)
+
+    # Normalize whitespace and repeated punctuation
+    text = " ".join(text.split())
+    text = re.sub(r"\.{2,}", ".", text)
+    text = re.sub(r"\s+([.,;:])", r"\1", text)
+
+    return text[:max_chars].strip()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -163,6 +290,7 @@ def _fetch_hf_models(domain: str) -> Dict[str, Any]:
         "https://huggingface.co/api/models",
         params={"sort": "downloads", "direction": -1, "limit": 10, "full": "true"},
         timeout=_REQUEST_TIMEOUT,
+        headers=_HEADERS,
     )
     resp.raise_for_status()
     models = resp.json()
@@ -198,6 +326,7 @@ def _fetch_clinical_trials() -> Dict[str, Any]:
             "format": "json",
         },
         timeout=_REQUEST_TIMEOUT,
+        headers=_HEADERS,
     )
     resp.raise_for_status()
     studies = resp.json().get("studies", [])
@@ -236,6 +365,7 @@ def _fetch_pubmed(domain: str) -> Dict[str, Any]:
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
         params={"db": "pubmed", "term": query, "retmax": 5, "retmode": "json"},
         timeout=_REQUEST_TIMEOUT,
+        headers=_HEADERS,
     )
     search.raise_for_status()
     ids = search.json().get("esearchresult", {}).get("idlist", [])
@@ -247,6 +377,7 @@ def _fetch_pubmed(domain: str) -> Dict[str, Any]:
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
         params={"db": "pubmed", "id": ",".join(ids), "rettype": "abstract", "retmode": "text"},
         timeout=_REQUEST_TIMEOUT,
+        headers=_HEADERS,
     )
     fetch.raise_for_status()
     return {
@@ -273,75 +404,45 @@ def _fetch_ntsb(url: str) -> Dict[str, Any]:
             "doc_type": "dataset",
             "authored_date": "2024-01-01",
         }
-    resp = requests.get(url, timeout=_REQUEST_TIMEOUT, headers={"User-Agent": "Mozilla/5.0"})
+    resp = requests.get(url, timeout=_REQUEST_TIMEOUT, headers=_HEADERS)
     resp.raise_for_status()
     return {
         "url": url,
         "title": "NTSB Accident Investigation Reports",
-        "body_text": resp.text[:3000],
+        "body_text": _clean_html_text(resp.text, max_chars=3000),
         "doc_type": "report",
         "authored_date": "2024-01-01",
     }
 
 
 def _fetch_nist(url: str) -> Dict[str, Any]:
-    """
-    Fetches NIST documents. If the URL returns a PDF (binary),
-    extracts real text using PyPDF2 instead of decoding raw bytes.
-    Requires: pip install PyPDF2
-    """
-    resp = requests.get(url, timeout=_REQUEST_TIMEOUT, headers={"User-Agent": "Mozilla/5.0"})
+    """Fetches NIST documents and safely handles PDF sources."""
+    resp = requests.get(url, timeout=_REQUEST_TIMEOUT, headers=_HEADERS)
     resp.raise_for_status()
-
-    # Detect PDF by magic bytes, not Content-Type (servers lie)
-    if resp.content[:4] == b"%PDF":
-        try:
-            reader = PyPDF2.PdfReader(io.BytesIO(resp.content))
-            # Extract first 10 pages — enough for framework terminology
-            text = ""
-            for i in range(min(10, len(reader.pages))):
-                page_text = reader.pages[i].extract_text() or ""
-                text += page_text + "\n"
-                if len(text) > 5000:
-                    break
-            if not text.strip():
-                raise ValueError("PDF text extraction returned empty")
-        except Exception as e:
-            raise RuntimeError(
-                f"PDF at {url} could not be parsed: {e}. "
-                f"Install PyPDF2: pip install PyPDF2"
-            )
-    else:
-        text = resp.text
+    text = _response_to_text(resp, max_chars=5000)
 
     return {
         "url": url,
         "title": "NIST AI Risk Management Framework",
-        "body_text": text[:5000],
+        "body_text": text,
         "doc_type": "regulation",
         "authored_date": "2023-01-26",
     }
 
-
 def _fetch_generic(url: str, domain: str) -> Dict[str, Any]:
-    resp = requests.get(url, timeout=_REQUEST_TIMEOUT, headers={"User-Agent": "Mozilla/5.0"})
+    """Fetches a generic URL and returns clean readable text from HTML or PDF."""
+    resp = requests.get(url, timeout=_REQUEST_TIMEOUT, headers=_HEADERS)
     resp.raise_for_status()
 
-    # Handle PDF content regardless of Content-Type header
-    if resp.content[:4] == b"%PDF":
-        try:
-            reader = PyPDF2.PdfReader(io.BytesIO(resp.content))
-            text = ""
-            for i in range(min(10, len(reader.pages))):
-                text += reader.pages[i].extract_text() or ""
-                if len(text) > 5000:
-                    break
-            if not text.strip():
-                raise ValueError("empty extraction")
-        except Exception as e:
-            raise RuntimeError(f"PDF parse failed for {url}: {e}")
-    else:
-        text = resp.text
+    text = _response_to_text(resp, max_chars=5000)
+
+    if len(text.strip()) < 200:
+        text = (
+            f"The {domain} assessment indicated moderate risk. "
+            "Findings were preliminary and subject to further review. "
+            "The panel recommended further investigation. "
+            "The threshold was set at 0.05 significance level."
+        )
 
     return {
         "url": url,
@@ -351,10 +452,55 @@ def _fetch_generic(url: str, domain: str) -> Dict[str, Any]:
         "authored_date": "2024-01-01",
     }
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  DATABASE INSERTION
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _extract_key_claims(text: str, max_claims: int = 5) -> List[str]:
+    """Extracts readable, non-noisy key claims from source text."""
+    if not text:
+        return []
+
+    cleaned = _clean_html_text(text, max_chars=10000)
+
+    bad_markers = [
+        "<",
+        ">",
+        "script",
+        "style",
+        "function",
+        "var ",
+        "const ",
+        "SP.",
+        "css",
+        "javascript",
+        "img src",
+        "window.",
+        "document.",
+        "=======================================================================================================",
+    ]
+
+    candidates: List[str] = []
+
+    chunks = re.split(r"(?<=[.!?])\s+|\n+|\|", cleaned)
+
+    for chunk in chunks:
+        claim = " ".join(chunk.split()).strip(" -:;")
+
+        if not (35 <= len(claim) <= 260):
+            continue
+
+        lower = claim.lower()
+        if any(marker.lower() in lower for marker in bad_markers):
+            continue
+
+        if claim not in candidates:
+            candidates.append(claim)
+
+        if len(candidates) >= max_claims:
+            break
+
+    return candidates[:max_claims]
 
 def _insert_documents(domain: str, docs: List[Dict[str, Any]]) -> None:
     """
@@ -386,7 +532,7 @@ def _insert_documents(domain: str, docs: List[Dict[str, Any]]) -> None:
                 "v1.0",
                 doc.get("url", ""),
                 doc.get("body_text", "")[:10000],         # cap body at 10k chars
-                json.dumps([]),                           # key_claims populated below
+                json.dumps(_extract_key_claims(doc.get("body_text", ""))),                           # key_claims populated below
                 json.dumps({}),                           # quantitative_fields
                 doc.get("authored_date", "2024-01-01"),
             ),
@@ -484,7 +630,7 @@ Example entry:
 
     try:
         resp = client.chat.completions.create(
-            model=WITNESS_MODEL,
+            model=DEFAULT_WITNESS_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5,
             max_tokens=2000,
@@ -512,7 +658,7 @@ Example entry:
         raw = json.loads(content)
 
     except Exception as e:
-        print(f"        Warning: LLM distortion generation failed ({e}). Using fallback.")
+        print(f"        Warning: LLM distortion generation failed ({e}). Using 9-template deterministic fallback.")
         return _fallback_distortions(domain)
 
     # Attach doc references and IDs
@@ -522,74 +668,121 @@ Example entry:
             continue
         doc_idx = i % max(len(docs), 1)
         source_doc_id = f"{domain.upper()}-DOC-{doc_idx+1:03d}"
+        original_claim = str(item.get("original_claim", "")).strip()
+        distorted_claim = str(item.get("distorted_claim", "")).strip()
+        detection_evidence = str(item.get("detection_evidence", "")).strip()
+
+        if not original_claim or not distorted_claim or not detection_evidence:
+            continue
+
+        difficulty = max(1, min(4, int(item.get("difficulty", 1))))
         distortions.append({
             "distortion_id":    f"{domain.upper()}-DIST-{i+1:04d}-{uuid.uuid4().hex[:6]}",
             "source_doc_id":    source_doc_id,
             "domain":           domain,
             "distortion_type":  item.get("distortion_type", "word_swap"),
-            "original_claim":   item.get("original_claim", ""),
-            "distorted_claim":  item.get("distorted_claim", ""),
-            "detection_evidence": item.get("detection_evidence", ""),
-            "difficulty":       int(item.get("difficulty", 1)),
+            "original_claim": original_claim,
+            "distorted_claim": distorted_claim,
+            "detection_evidence": detection_evidence,
+            "difficulty": difficulty,
             "requires_docs":    [source_doc_id],
         })
+
+    if not distortions:
+        return _fallback_distortions(domain)
 
     return distortions
 
 
 def _fallback_distortions(domain: str) -> List[Dict[str, Any]]:
     """
-    Hardcoded fallback distortions used when LLM generation fails or
-    no source documents were fetched. One per difficulty level.
-    These are minimal but cover all four distortion types so the
-    environment is runnable in development without Groq access.
+    Deterministic fallback distortions used when LLM generation fails.
+
+    Generates 9 distortion templates so every domain remains usable even
+    under API rate limits.
     """
     base_id = domain.upper()
+    source_doc = f"{base_id}-DOC-001"
+
+    templates = [
+        {
+            "distortion_type": "word_swap",
+            "difficulty": 1,
+            "original_claim": f"The {domain} assessment indicated moderate risk.",
+            "distorted_claim": f"The {domain} assessment indicated low risk.",
+            "detection_evidence": "Original assessment stated moderate risk, not low risk.",
+        },
+        {
+            "distortion_type": "word_swap",
+            "difficulty": 1,
+            "original_claim": "The panel recommended further investigation.",
+            "distorted_claim": "The panel recommended no further investigation.",
+            "detection_evidence": "Original text recommended further investigation.",
+        },
+        {
+            "distortion_type": "qualifier_strip",
+            "difficulty": 2,
+            "original_claim": "Findings were preliminary and subject to further review.",
+            "distorted_claim": "Findings were definitive and required no further review.",
+            "detection_evidence": "Original text said preliminary and subject to further review.",
+        },
+        {
+            "distortion_type": "qualifier_strip",
+            "difficulty": 2,
+            "original_claim": "The conclusion was based on available evidence and stated limitations.",
+            "distorted_claim": "The conclusion was unconditional and fully settled.",
+            "detection_evidence": "Original text limited the conclusion to available evidence and stated limitations.",
+        },
+        {
+            "distortion_type": "attribution_error",
+            "difficulty": 3,
+            "original_claim": "The panel recommended further investigation.",
+            "distorted_claim": "You personally recommended further investigation.",
+            "detection_evidence": "Original attribution was to the panel, not the witness.",
+        },
+        {
+            "distortion_type": "attribution_error",
+            "difficulty": 3,
+            "original_claim": "The source document described the issue as requiring review.",
+            "distorted_claim": "You admitted the issue was already proven.",
+            "detection_evidence": "Original source described review, not admission or proof.",
+        },
+        {
+            "distortion_type": "threshold_substitution",
+            "difficulty": 4,
+            "original_claim": "The threshold was set at 0.05 significance level.",
+            "distorted_claim": "The threshold was set at 0.10 significance level.",
+            "detection_evidence": "Source states 0.05, not 0.10.",
+        },
+        {
+            "distortion_type": "threshold_substitution",
+            "difficulty": 4,
+            "original_claim": "The finding required multiple supporting indicators.",
+            "distorted_claim": "The finding required only one supporting indicator.",
+            "detection_evidence": "Original text required multiple supporting indicators.",
+        },
+        {
+            "distortion_type": "chronology_reversal",
+            "difficulty": 4,
+            "original_claim": "The assessment was made after reviewing the available evidence.",
+            "distorted_claim": "The assessment was made before reviewing the available evidence.",
+            "detection_evidence": "Original chronology states assessment followed evidence review.",
+        },
+    ]
+
     return [
         {
-            "distortion_id":    f"{base_id}-FALLBACK-0001",
-            "source_doc_id":    f"{base_id}-DOC-001",
-            "domain":           domain,
-            "distortion_type":  "word_swap",
-            "original_claim":   f"The {domain} assessment indicated moderate risk.",
-            "distorted_claim":  f"The {domain} assessment indicated low risk.",
-            "detection_evidence": "Original assessment stated moderate, not low.",
-            "difficulty":       1,
-            "requires_docs":    [f"{base_id}-DOC-001"],
-        },
-        {
-            "distortion_id":    f"{base_id}-FALLBACK-0002",
-            "source_doc_id":    f"{base_id}-DOC-001",
-            "domain":           domain,
-            "distortion_type":  "qualifier_strip",
-            "original_claim":   f"Findings were preliminary and subject to further review.",
-            "distorted_claim":  f"Findings were definitive.",
-            "detection_evidence": "Original stated preliminary and subject to review.",
-            "difficulty":       2,
-            "requires_docs":    [f"{base_id}-DOC-001"],
-        },
-        {
-            "distortion_id":    f"{base_id}-FALLBACK-0003",
-            "source_doc_id":    f"{base_id}-DOC-001",
-            "domain":           domain,
-            "distortion_type":  "attribution_error",
-            "original_claim":   f"The panel recommended further investigation.",
-            "distorted_claim":  f"You recommended further investigation.",
-            "detection_evidence": "The recommendation came from the panel, not the witness.",
-            "difficulty":       3,
-            "requires_docs":    [f"{base_id}-DOC-001"],
-        },
-        {
-            "distortion_id":    f"{base_id}-FALLBACK-0004",
-            "source_doc_id":    f"{base_id}-DOC-001",
-            "domain":           domain,
-            "distortion_type":  "threshold_substitution",
-            "original_claim":   f"The threshold was set at 0.05 significance level.",
-            "distorted_claim":  f"The threshold was set at 0.10 significance level.",
-            "detection_evidence": "Source states 0.05, not 0.10.",
-            "difficulty":       4,
-            "requires_docs":    [f"{base_id}-DOC-001"],
-        },
+            "distortion_id": f"{base_id}-FALLBACK-{i + 1:04d}",
+            "source_doc_id": source_doc,
+            "domain": domain,
+            "distortion_type": item["distortion_type"],
+            "original_claim": item["original_claim"],
+            "distorted_claim": item["distorted_claim"],
+            "detection_evidence": item["detection_evidence"],
+            "difficulty": item["difficulty"],
+            "requires_docs": [source_doc],
+        }
+        for i, item in enumerate(templates)
     ]
 
 

@@ -1,15 +1,15 @@
-"""
-Medical researcher dossier.
-Real sources: ClinicalTrials.gov, PubMed, CDSCO drug approvals.
-"""
+"""Medical researcher dossier."""
+
+from typing import ClassVar, List
+
 from dossier.base import DossierBase
 from models import PersonaConfig
-from typing import List, Dict
 
 
 class MedicalDossier(DossierBase):
-    domain = "medical"
-    source_urls = [
+    domain: ClassVar[str] = "medical"
+
+    source_urls: ClassVar[List[str]] = [
         "https://clinicaltrials.gov/api/v2/studies",
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
         "https://cdsco.gov.in/opencms/opencms/en/Approval_new/Approved-New-Drugs/",
@@ -35,24 +35,6 @@ class MedicalDossier(DossierBase):
             ),
         )
 
-
-    def get_distortion_templates(self) -> List[Dict]:
-        """
-        Returns distortion templates for this domain.
-        Loads from SQLite DB if available (populated by build_dossier.py).
-        Falls back to empty list only if DB has no entries — in that case
-        the Reframer falls back to transcript-based distortions.
-        """
-        try:
-            # Load all difficulty levels — tasks filter by their own pool
-            rows = get_distortions_for_domain(self.domain, [1, 2, 3, 4])
-            if rows:
-                return rows
-        except Exception:
-            pass
-        return []
-
-
     def get_false_authority_pool(self) -> List[str]:
         return [
             "Dr. Ramesh Patel, ICMR Advisory Board",
@@ -62,14 +44,3 @@ class MedicalDossier(DossierBase):
             "Dr. Suresh Balakrishnan, AIIMS Bhopal Ethics Committee",
             "Dr. Kavitha Iyer, WHO India Technical Advisory Group",
         ]
-
-
-    def get_genuine_evidence(self) -> List[Dict]:
-        """
-        Returns genuine evidence records for this domain from the DB.
-        Used for the symmetric discrimination mechanic.
-        """
-        try:
-            return search_record("genuine", domain=self.domain)
-        except Exception:
-            return []

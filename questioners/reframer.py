@@ -1,18 +1,16 @@
-"""
-Reframer questioner — distorts content of prior witness statements.
-Tracks which distortions it has already used. No repeats within an episode.
-"""
+"""Reframer distorts prior claims and evidence into adversarial courtroom questions."""
+
 import random
-from typing import List, Set, Dict, Optional
+from typing import Any, Dict, List, Optional, Set
+
+from models import PersonaConfig, TurnType
 from questioners.base import QuestionerBase
 from transcript.store import TranscriptStore
-from models import PersonaConfig, TurnType
 
 
 class Reframer(QuestionerBase):
     questioner_id = "reframer"
 
-    # Distortion types the Reframer can deploy, matched to dossier_db types
     _DISTORTION_TYPES = [
         "word_swap",
         "qualifier_strip",
@@ -21,102 +19,136 @@ class Reframer(QuestionerBase):
         "threshold_substitution",
     ]
 
-    def __init__(self):
-        self._distortion_pool: List[Dict] = []
+    _COURTROOM_FRAMES = [
+        "Let me put your earlier position back to you: {claim}. Is that accurate?",
+        "For the record, your position is now {claim}. Correct?",
+        "You previously committed to this proposition: {claim}. Do you stand by that?",
+        "I want a clear answer. You are saying {claim}, yes?",
+        "So the fair summary of your evidence is this: {claim}. Correct?",
+    ]
+
+    _FALLBACK_TEMPLATES = [
+        "Earlier you stated {claim}. Is that still your position?",
+        "You said {claim}, but that appears to contradict what you told us previously. Correct?",
+        "I want to be clear: you committed to {claim}. Is that your testimony?",
+    ]
+
+    def __init__(self, rng: Optional[random.Random] = None) -> None:
+        super().__init__(rng=rng)
+        self._distortion_pool: List[Dict[str, Any]] = []
         self._used_ids: Set[str] = set()
-
-        # Strategy: track which distortion types slip past this witness
-        # Higher weight = this type has worked recently, use it more
         self._type_weights: Dict[str, float] = {
-            t: 1.0 for t in self._DISTORTION_TYPES
+            distortion_type: 1.0 for distortion_type in self._DISTORTION_TYPES
         }
-
-        # Last fired distortion for outcome recording
         self._last_fired_type: Optional[str] = None
-
-        self._fallback_templates: List[str] = [
-            "Earlier you stated {claim}. Is that still your position?",
-            "You said {claim} — but that contradicts what you told us previously.",
-            "I want to be clear — you committed to {claim}. Correct?",
-        ]
+        self._last_fired_distortion: Optional[Dict[str, Any]] = None
 
     def reset(self) -> None:
         self._used_ids = set()
         self._last_fired_type = None
-        # Weights persist — the Reframer carries learned strategy across episodes
+        self._last_fired_distortion = None
 
-    def load_distortions(self, pool: List[Dict]) -> None:
-        self._distortion_pool = pool
+    def load_distortions(self, pool: List[Dict[str, Any]]) -> None:
+        self._distortion_pool = list(pool)
 
     def record_outcome(self, was_detected: bool) -> None:
-        """
-        Called by environment.py after grader scores a distortion injection turn.
-        was_detected=True  — witness caught it, downweight this distortion type.
-        was_detected=False — witness missed it, upweight this distortion type.
-        """
         if not self._last_fired_type:
             return
 
-        self._type_weights[self._last_fired_type] = self._update_weight(self._type_weights[self._last_fired_type], was_detected)
+        current = self._type_weights.get(self._last_fired_type, 1.0)
+        self._type_weights[self._last_fired_type] = self._update_weight(
+            current,
+            was_detected,
+        )
 
     def generate_turn(self, transcript: TranscriptStore, persona: PersonaConfig) -> str:
         witness_turns = transcript.get_witness_turns()
-
         if not witness_turns:
             return (
-                f"Please state your name, title, and the nature of your "
-                f"assessment for the record."
+                "Please state your name, title, and the assessment you are here "
+                "to defend for the record."
             )
 
         available = [
-            d for d in self._distortion_pool
-            if d.get("distortion_id") not in self._used_ids
+            distortion
+            for distortion in self._distortion_pool
+            if distortion.get("distortion_id") not in self._used_ids
         ]
 
         if available:
             distortion = self._weighted_choice(available)
-            self._used_ids.add(distortion["distortion_id"])
-            self._last_fired_type = distortion.get("distortion_type", "word_swap")
-            return distortion["distorted_claim"]
+            self._last_fired_distortion = distortion
+            distortion_id = distortion.get("distortion_id")
+            if distortion_id:
+                self._used_ids.add(distortion_id)
 
-        # Pool exhausted — fall back to transcript-based distortion
+            self._last_fired_type = distortion.get("distortion_type", "word_swap")
+
+            distorted_claim = str(distortion.get("distorted_claim", "")).strip()
+            if not distorted_claim:
+                return self._distort_from_transcript(witness_turns)
+
+            return self._frame_distortion(distorted_claim)
+
         self._last_fired_type = "qualifier_strip"
         return self._distort_from_transcript(witness_turns)
 
-    def _weighted_choice(self, available: List[Dict]) -> Dict:
-        """
-        Picks a distortion weighted by the historical success of its type.
-        Types that have slipped past this witness get higher selection probability.
-        """
+    def _weighted_choice(self, available: List[Dict[str, Any]]) -> Dict[str, Any]:
         weights = [
             self._type_weights.get(
-                d.get("distortion_type", "word_swap"), 1.0
+                distortion.get("distortion_type", "word_swap"),
+                1.0,
             )
-            for d in available
+            for distortion in available
         ]
-        return random.choices(available, weights=weights, k=1)[0]
+        return self.rng.choices(available, weights=weights, k=1)[0]
+
+    def _frame_distortion(self, distorted_claim: str) -> str:
+        frame = self.rng.choice(self._COURTROOM_FRAMES)
+        return frame.format(claim=f'"{distorted_claim}"')
 
     def _distort_from_transcript(self, witness_turns: list) -> str:
-        """
-        Fallback: strips qualifiers from the most recent witness statement
-        to simulate a difficulty-1 qualifier_strip distortion.
-        Used when the pool is empty or exhausted.
-        """
         recent = witness_turns[-1].text if witness_turns else ""
         if not recent:
             return "Could you clarify your earlier statement for the record?"
 
-        stripped = recent
-        for qualifier in [
-            "moderate-to-elevated", "moderate to elevated",
-            "with caveats", "subject to", "pending", "provisional",
-            "approximately", "roughly", "around", "tentatively",
-        ]:
+        stripped = self._strip_qualifiers(recent)
+        excerpt = stripped.strip()[:140]
+
+        template = self.rng.choice(self._FALLBACK_TEMPLATES)
+        return template.format(claim=f'"{excerpt}"')
+
+    def _strip_qualifiers(self, text: str) -> str:
+        stripped = text
+
+        qualifiers = [
+            "moderate-to-elevated",
+            "moderate to elevated",
+            "with caveats",
+            "subject to",
+            "pending",
+            "provisional",
+            "approximately",
+            "roughly",
+            "around",
+            "tentatively",
+            "based on available data",
+            "the evidence suggests",
+            "in my assessment",
+            "it appears",
+            "may",
+            "might",
+            "could",
+        ]
+
+        for qualifier in qualifiers:
             stripped = stripped.replace(qualifier, "")
 
-        excerpt = stripped.strip()[:120]
-        template = random.choice(self._fallback_templates)
-        return template.format(claim=f'"{excerpt}"')
+        return " ".join(stripped.split())
+
+    @property
+    def last_fired_distortion(self) -> Optional[Dict[str, Any]]:
+        return self._last_fired_distortion
 
     def get_turn_type(self) -> TurnType:
         return TurnType.DISTORTION_INJECTION

@@ -1,39 +1,50 @@
-"""Abstract base for all questioner types."""
+"""Base contract and shared utilities for all questioner types."""
+
+import random
 from abc import ABC, abstractmethod
-from transcript.store import TranscriptStore
+from typing import Optional
+
 from models import PersonaConfig, TurnType
+from transcript.store import TranscriptStore
 
 
 class QuestionerBase(ABC):
     questioner_id: str = ""
 
-    @abstractmethod
-    def generate_turn(self, transcript: TranscriptStore, persona: PersonaConfig) -> str: ...
+    def __init__(self, rng: Optional[random.Random] = None) -> None:
+        self.rng = rng or random.Random(0)
 
     @abstractmethod
-    def get_turn_type(self) -> TurnType: ...
+    def generate_turn(self, transcript: TranscriptStore, persona: PersonaConfig) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_turn_type(self) -> TurnType:
+        raise NotImplementedError
 
     def record_outcome(self, was_detected: bool) -> None:
-        """No-op default. Stateful questioners override to update strategy weights."""
+        """Optional feedback hook. Adaptive questioners override this."""
         pass
 
     def observe_witness_response(self, response_text: str) -> None:
-        """No-op default. ExhaustionTactic overrides to track response length trends."""
+        """Optional response hook. ExhaustionTactic uses this."""
         pass
 
-    def observe_transcript(self, transcript) -> None:
-        """No-op default. TemporalQuestioner overrides to build turn-claim map."""
+    def observe_transcript(self, transcript: TranscriptStore) -> None:
+        """Optional transcript hook. TemporalQuestioner uses this."""
         pass
 
     def reset(self) -> None:
+        """Reset per-episode state."""
         pass
 
-    # ── Shared weight update ──────────────────────────────────────────
     @staticmethod
     def _update_weight(current: float, was_detected: bool) -> float:
-        """Multiplicative update shared by all adaptive questioners.
-        Detected → downweight 0.85×, floor 0.1.
-        Missed   → upweight  1.20×, ceiling 5.0.
+        """
+        Shared multiplicative update for adaptive adversaries.
+
+        Detected attack  -> reduce future use of that tactic.
+        Missed attack    -> increase future use of that tactic.
         """
         if was_detected:
             return max(0.1, current * 0.85)

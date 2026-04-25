@@ -1,42 +1,35 @@
-# ── The Witness Stand — HuggingFace Spaces Dockerfile ──────────────────────
-# Builds and serves the OpenEnv environment + dashboard.
+# The Witness Stand — HuggingFace Spaces Dockerfile
 # Port 7860 is required by HuggingFace Spaces.
 
 FROM python:3.11-slim
 
-# System dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# Install Python dependencies first (layer cache — rebuild only when deps change)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy source
+COPY requirements.txt pyproject.toml README.md ./
+
+RUN python -m pip install --upgrade pip \
+    && pip install -r requirements.txt
+
 COPY . .
 
-# Install the package in editable mode so all imports resolve
-RUN pip install --no-cache-dir -e .
+RUN pip install -e . \
+    && mkdir -p data/personas logs/health logs/episodes logs/eval logs/training
 
-# Create runtime directories (data/ and logs/ are gitignored but needed at runtime)
-RUN mkdir -p data/personas logs/episodes logs/eval logs/training
-
-# Build dossier artifacts at container startup.
-# GROQ_API_KEY is not available at Docker build time — this runs once on cold start.
-# If the build fails (no key), the container still starts; the /build endpoint
-# in server/app.py can trigger a rebuild after secrets are injected via HF Space settings.
-RUN python scripts/build_dossier.py || echo "[dossier] Skipped — GROQ_API_KEY not set at build time. Run /build after deployment."
-
-# Expose HF Spaces port
+# Do not build the dossier at Docker build time because HF secrets are not
+# available during image build. Build it after deployment/startup when secrets
+# are injected, or run scripts/00_build_dossier.py manually.
 EXPOSE 7860
 
-# Health check — confirms the FastAPI app is responding
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:7860/health || exit 1
 
-# Start the server
 CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]

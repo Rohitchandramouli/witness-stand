@@ -1,31 +1,29 @@
-# ── The Witness Stand — Python dependencies ────────────────────────────────
-# Python >= 3.11 required.
-# Install: pip install -r requirements.txt
+# The Witness Stand — Python dependencies
+# Python >= 3.11
 
-# ── Web server ─────────────────────────────────────────────────────────────
+# Web server
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 
-# ── OpenEnv interface ──────────────────────────────────────────────────────
+# OpenEnv interface
 openenv-core>=0.2.3
 
-# ── LLM inference (Groq API) ───────────────────────────────────────────────
+# LLM inference
 groq>=0.5.0
 
-# ── Training (HF TRL GRPO) ────────────────────────────────────────────────
-# These are large. On HF Spaces they install from the base image.
-# Comment out locally if you only need the environment + grader.
-torch>=2.0.0
-transformers>=4.40.0
-trl>=0.8.0
-accelerate>=0.27.0
-peft>=0.10.0
-
-# ── Data / config ──────────────────────────────────────────────────────────
+# Data/config
 pydantic>=2.0.0
 python-dotenv>=1.0.0
 pyyaml>=6.0.0
 requests>=2.31.0
 
-# ── PDF parsing (dossier build — technical domain) ─────────────────────────
+# PDF parsing for dossier build
 PyPDF2>=3.0.0
+
+# Training stack
+# These are intentionally listed last because they are large.
+torch>=2.0.0
+transformers>=4.40.0
+trl>=0.8.0
+accelerate>=0.27.0
+peft>=0.10.0

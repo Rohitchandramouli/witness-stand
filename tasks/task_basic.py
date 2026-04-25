@@ -1,60 +1,33 @@
-"""
-Basic task — Reframer only, 10 turns, no lag, rotating domains after each episode.
-"""
-import random
-from tasks.base import TaskBase
+"""Basic task: direct distortion detection with Reframer only."""
+
+from questioners.neutral import NeutralQuestioner
 from questioners.panel import QuestionerPanel
 from questioners.reframer import Reframer
-from questioners.neutral import NeutralQuestioner
-from constants import DISTORTION_DIFFICULTY
+from tasks.base import TaskBase
 
 
 class TaskBasic(TaskBase):
-    """
-    Single-session regulatory inquiry.
-    Questioner: Reframer only.
-    Turns: 10 | Sessions: 1 | Lag: 0
-    Distortion difficulty: 1 only (direct word substitutions).
-    Domain: randomly sampled from all 4 per episode.
-
-    Turn structure:
-      1     — witness opens, states identity and assessment (neutral)
-      2     — neutral follow-up, witness elaborates methodology
-      3     — DISTORTION INJECTION (turn 3 chosen so witness has made
-                2 substantive statements to distort)
-      4     — neutral follow-up
-      5     — neutral follow-up, witness continues building record
-      6     — DISTORTION INJECTION (mid-episode, targets a different
-                statement than turn 3)
-      7     — neutral follow-up
-      8     — neutral follow-up
-      9     — DISTORTION INJECTION (late pressure — witness is tired,
-                record is long, harder to track all prior statements)
-      10    — neutral closing — grader requests audit reconstruction
-    """
-
     task_name = "basic"
 
+    DEMO_SCHEDULE = {
+    2: "reframer",
+    4: "reframer",
+    }
+
     def _build_panel(self) -> QuestionerPanel:
-        reframer = Reframer()
-        neutral = NeutralQuestioner()
+        reframer = Reframer(rng=self.rng)
+        neutral = NeutralQuestioner(rng=self.rng)
 
-        # Load only difficulty-1 distortions for this tier
-        distortions = self._dossier.get_distortion_templates()
-        difficulty_pool = [
-            d for d in distortions
-            if d.get("difficulty") in DISTORTION_DIFFICULTY[self.task_name]
-        ]
-        reframer.load_distortions(difficulty_pool)
+        reframer.load_distortions(self._difficulty_pool())
 
-        # Inject at turns 3, 6, 9 — neutral on all others
-        schedule = {
-            3: reframer,
-            6: reframer,
-            9: reframer,
-        }
+        if self.mode == "demo":
+            schedule = {
+                turn: reframer
+                for turn, role in self.DEMO_SCHEDULE.items()
+                if role == "reframer" and turn <= self.total_turns
+            }
+        else:
+            attack_turns = self._sample_attack_turns(count=3, earliest_turn=3)
+            schedule = {turn: reframer for turn in attack_turns}
 
-        return QuestionerPanel(
-            schedule=schedule,
-            default_questioner=neutral,
-        )
+        return QuestionerPanel(schedule=schedule, default_questioner=neutral)
