@@ -357,7 +357,7 @@
   <span class="nav-tab" onclick="showTab('environment',this)">Environment</span>
   <span class="nav-tab" onclick="showTab('reward',this)">Reward</span>
   <span class="nav-tab" onclick="showTab('results',this)">Results</span>
-  <span class="nav-tab" onclick="showTab('tryit',this)">Try Now!</span>
+  <span class="nav-tab" onclick="showTab('tryit',this)" style="color:var(--teal);font-weight:600">▶ Try Now!</span>
   <span class="nav-tab" onclick="showTab('close',this)">Close</span>
 </nav>
 
@@ -735,74 +735,92 @@
 
 <!-- ═══════════════════════ TAB 6 — TRY NOW! ═══════════════════════ -->
 <div id="tab-tryit" class="tab">
-    <div class="page">
+<div class="page">
+  <div class="eyebrow">Live demo</div>
+  <div class="headline">Cross-examine the witness.<br><em style="color:var(--teal)">Right now.</em></div>
 
-        <div class="eyebrow">Live Demo</div>
-        <div class="headline">
-            Cross-examine the witness.<br>
-            <em style="color:var(--teal)">Right now.</em>
-        </div>
-
-        <div style="margin-top:2rem;background:var(--paper-2);border:.5px solid var(--border-s);border-radius:12px;padding:1.5rem">
-
-            <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);margin-bottom:1rem">
-                Question Input
-            </div>
-
-            <div style="display:flex;align-items:center;gap:10px">
-
-                <input
-                    id="ti-input"
-                    type="text"
-                    placeholder="Ask the witness something..."
-                    style="
-                    flex:1;
-                    background:transparent;
-                    border:none;
-                    border-bottom:1.5px solid var(--border-s);
-                    padding:.6rem 0;
-                    font-size:15px;
-                    outline:none;
-                    color:var(--ink);
-                    font-family:var(--serif);
-                    "
-                    onkeydown="if(event.key==='Enter'){tiSend()}"
-                >
-
-                <button
-                    onclick="tiSend()"
-                    style="
-                    background:none;
-                    border:none;
-                    cursor:pointer;
-                    font-size:18px;
-                    color:var(--gold);
-                    padding:0 4px;
-                    "
-                    >▼
-                </button>
-
-            </div>
-
-        </div>
-
-        <div id="ti-output"
-            style="
-            margin-top:1.5rem;
-            background:var(--navy);
-            color:white;
-            padding:1.2rem;
-            border-radius:12px;
-            min-height:120px;
-            font-family:var(--serif);
-            line-height:1.7;
-            "
-        >
-            Awaiting cross-examination...
-        </div>
-
+  <!-- CONFIG ROW -->
+  <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:1rem;align-items:end">
+    <div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);margin-bottom:6px">Task tier</div>
+      <select id="ti-task" style="width:100%;background:var(--paper-2);border:.5px solid var(--border-s);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:var(--sans);cursor:pointer">
+        <option value="basic">Basic · 10 turns · Reframer only</option>
+        <option value="intermediate">Intermediate · 20 turns · + Authority Invoker</option>
+        <option value="advanced">Advanced · 30 turns · + Exhaustion Tactic</option>
+        <option value="expert">Expert · 40 turns · + Temporal Questioner</option>
+      </select>
     </div>
+    <div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);margin-bottom:6px">Domain</div>
+      <select id="ti-domain" onchange="tiUpdatePersonaPreview()" style="width:100%;background:var(--paper-2);border:.5px solid var(--border-s);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:var(--sans);cursor:pointer">
+        <option value="">Auto-assign</option>
+        <option value="medical">Medical</option>
+        <option value="financial">Financial</option>
+        <option value="safety">Safety</option>
+        <option value="technical">Technical</option>
+      </select>
+    </div>
+    <button id="ti-start-btn" onclick="tiStart()" style="background:var(--teal);color:#fff;border:none;border-radius:6px;padding:9px 22px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;height:38px;margin-bottom:0">Start Session</button>
+  </div>
+
+  <!-- PERSONA PREVIEW (shown when domain selected) -->
+  <div id="ti-persona-preview" style="display:none;background:var(--paper-2);border:.5px solid var(--border-s);border-radius:8px;padding:.85rem 1rem;margin-bottom:1rem">
+    <div style="display:flex;gap:1rem;align-items:flex-start">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px;font-weight:700;color:#fff" id="ti-avatar">—</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--ink)" id="ti-preview-name">—</div>
+        <div style="font-size:11px;color:var(--ink-3);margin-top:1px" id="ti-preview-title">—</div>
+        <div style="font-size:11px;color:var(--ink-4);margin-top:1px" id="ti-preview-inst">—</div>
+        <div style="font-size:11px;color:var(--ink-3);margin-top:6px;font-style:italic;line-height:1.5;border-left:2px solid var(--teal);padding-left:8px" id="ti-preview-philosophy">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div id="ti-status" style="display:none;background:var(--paper-2);border:.5px solid var(--border-s);border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:1.5rem">
+        <div><span style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4)">Witness</span><br><span id="ti-persona" style="font-size:13px;color:var(--teal);font-weight:500">—</span></div>
+        <div><span style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4)">Domain</span><br><span id="ti-domain-disp" style="font-size:13px;color:var(--ink-2);text-transform:capitalize">—</span></div>
+        <div><span style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4)">Turn</span><br><span id="ti-turn" style="font-size:13px;color:var(--ink-2)">0 / 0</span></div>
+      </div>
+      <button onclick="tiReset()" style="font-size:11px;color:var(--ink-3);background:none;border:.5px solid var(--border-s);border-radius:4px;padding:4px 12px;cursor:pointer">↺ New session</button>
+    </div>
+    <!-- turn progress bar -->
+    <div style="margin-top:.65rem;background:var(--paper-3);border-radius:2px;height:3px">
+      <div id="ti-progress" style="height:3px;border-radius:2px;background:var(--teal);width:0%;transition:width .4s ease"></div>
+    </div>
+  </div>
+
+  <!-- COURTROOM TRANSCRIPT -->
+  <div id="ti-courtroom" style="background:var(--navy);border-radius:12px;overflow:hidden;margin-bottom:1rem;display:none">
+    <div style="padding:.75rem 1.25rem;border-bottom:.5px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:8px">
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite"></div>
+      <span style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4)">Live transcript</span>
+    </div>
+    <div id="ti-transcript" style="padding:1.25rem;display:flex;flex-direction:column;gap:14px;max-height:380px;overflow-y:auto;scroll-behavior:smooth"></div>
+  </div>
+
+  <!-- SCORE CARD (shown after session ends) -->
+  <div id="ti-scorecard" style="display:none;background:var(--paper-2);border:.5px solid var(--border-s);border-radius:12px;padding:1.5rem;margin-bottom:1rem">
+    <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);margin-bottom:1rem">Session score</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="ti-scores-grid"></div>
+  </div>
+
+  <!-- watching indicator -->
+  <div id="ti-input-area" style="display:none;text-align:center;padding:.75rem;font-size:11px;color:var(--ink-4);letter-spacing:.08em;text-transform:uppercase">
+    <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--teal);display:inline-block;animation:pulse 1.5s infinite"></span>LLMs are speaking — observing live</span>
+  </div>
+
+  <!-- IDLE STATE -->
+  <div id="ti-idle" style="text-align:center;padding:3rem 1rem;border:.5px dashed var(--border-s);border-radius:12px;color:var(--ink-4)">
+    <div style="font-size:32px;margin-bottom:.75rem">⚖️</div>
+    <div style="font-size:14px;color:var(--ink-3)">Choose a task tier above and hit <strong style="color:var(--ink-2)">Start Session</strong> to begin cross-examination.</div>
+    <div style="font-size:12px;margin-top:.5rem;color:var(--ink-4)">Make sure your server is running at <code style="background:var(--paper-3);padding:2px 6px;border-radius:3px;font-size:11px">localhost:7860</code></div>
+  </div>
 </div>
+</div>
+
 <!-- ═══════════════════════ TAB 7 — CLOSE ═══════════════════════ -->
 <div id="tab-close" class="tab">
 <div class="page">
@@ -921,46 +939,219 @@ function buildChart(k) {
   }});
 }
 function switchChart(k,btn) {document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');buildChart(k);}
+// ── Witness Stand Live UI ──────────────────────────────────────────
+const API = 'http://localhost:7860';
+let tiState = { sessionId: null, turn: 0, total: 0, done: false };
+
+const TI_PERSONAS = {
+  medical: {
+    name: 'Dr. Meera Subramanian',
+    title: 'Principal Investigator',
+    institution: 'AIIMS New Delhi, Dept. of Clinical Pharmacology',
+    years: 18,
+    philosophy: 'Statistical significance and clinical significance are not the same thing. I report both, always.'
+  },
+  financial: {
+    name: 'Dr. Priya Venkataraman',
+    title: 'Senior Risk Analyst',
+    institution: 'Edelweiss Alternative Asset Managers',
+    years: 14,
+    philosophy: 'Caveats are not qualifications to be stripped for convenience. They are load-bearing analytical conclusions.'
+  },
+  safety: {
+    name: 'Arjun Raghavendra',
+    title: 'Senior Safety Systems Engineer',
+    institution: 'BHEL Power Sector, Noida',
+    years: 16,
+    philosophy: 'An RPN score is not a judgment; it is a calculation. The inputs must be defensible, not convenient.'
+  },
+  technical: {
+    name: 'Sahana Krishnaswamy',
+    title: 'AI Systems Auditor',
+    institution: 'Responsible AI Institute, Bengaluru',
+    years: 9,
+    philosophy: 'A model card is a commitment, not a disclaimer. I audit against what was promised, not just what is possible.'
+  }
+};
+
+function tiUpdatePersonaPreview() {
+  const domain = document.getElementById('ti-domain').value;
+  const preview = document.getElementById('ti-persona-preview');
+  if (!domain || !TI_PERSONAS[domain]) { preview.style.display = 'none'; return; }
+  const p = TI_PERSONAS[domain];
+  const initials = p.name.split(' ').map(w => w[0]).filter((_,i,a) => i === 0 || i === a.length-1).join('');
+  document.getElementById('ti-avatar').textContent = initials;
+  document.getElementById('ti-preview-name').textContent = p.name;
+  document.getElementById('ti-preview-title').textContent = `${p.title} · ${p.years} yrs experience`;
+  document.getElementById('ti-preview-inst').textContent = p.institution;
+  document.getElementById('ti-preview-philosophy').textContent = '"' + p.philosophy + '"';
+  preview.style.display = 'block';
+}
+
+async function tiStart() {
+  const task = document.getElementById('ti-task').value;
+  const domain = document.getElementById('ti-domain').value;
+  const btn = document.getElementById('ti-start-btn');
+  btn.textContent = 'Starting…'; btn.disabled = true;
+
+  try {
+    const body = { task };
+    if (domain) body.domain = domain;
+    const r = await fetch(`${API}/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error(`Server returned ${r.status}`);
+    const d = await r.json();
+
+    tiState = { sessionId: d.session_id, turn: d.turn_number, total: d.total_turns, done: false, currentQuestion: d.questioner_text };
+
+    const resolvedDomain = d.domain || domain || 'unknown';
+    const persona = TI_PERSONAS[resolvedDomain];
+    const personaName = persona ? persona.name : (d.persona_name || '—');
+
+    document.getElementById('ti-idle').style.display = 'none';
+    document.getElementById('ti-persona-preview').style.display = 'none';
+    document.getElementById('ti-status').style.display = 'block';
+    document.getElementById('ti-courtroom').style.display = 'block';
+    document.getElementById('ti-input-area').style.display = 'block';
+    document.getElementById('ti-scorecard').style.display = 'none';
+    document.getElementById('ti-transcript').innerHTML = '';
+
+    document.getElementById('ti-persona').textContent = personaName;
+    document.getElementById('ti-domain-disp').textContent = resolvedDomain;
+    tiUpdateStatus();
+
+    // auto-run all turns
+    await tiRunLoop();
+  } catch(e) {
+    alert('Could not connect to localhost:7860.\n\nMake sure the server is running:\ndocker run -p 7860:7860 -e GROQ_API_KEY=... witness-stand\n\nError: ' + e.message);
+  } finally {
+    btn.textContent = 'Start Session'; btn.disabled = false;
+  }
+}
+
+async function tiRunLoop() {
+  while (!tiState.done) {
+    const question = tiState.currentQuestion;
+    if (!question) break;
+
+    try {
+      const r = await fetch(`${API}/step`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: tiState.sessionId, content: question })
+      });
+      if (!r.ok) throw new Error(`Server returned ${r.status}`);
+      const d = await r.json();
+
+      tiState.turn = d.turn_number ?? tiState.turn + 1;
+
+      // show questioner question then witness reply
+      tiAppendMessage('questioner', question);
+      if (d.witness_text) tiAppendMessage('witness', d.witness_text, d);
+
+      tiUpdateStatus();
+
+      if (d.done || tiState.turn >= tiState.total) {
+        tiState.done = true;
+        break;
+      }
+
+      tiState.currentQuestion = d.questioner_text;
+    } catch(e) {
+      tiAppendMessage('system', '⚠ ' + e.message);
+      break;
+    }
+  }
+
+  document.getElementById('ti-input-area').style.display = 'none';
+  await tiFinish();
+}
+
+async function tiFinish() {
+  document.getElementById('ti-input-area').style.display = 'none';
+  tiAppendMessage('system', 'Session complete — fetching score…');
+  try {
+    const r = await fetch(`${API}/score/${tiState.sessionId}`);
+    if (!r.ok) throw new Error(`Score fetch failed (${r.status})`);
+    const d = await r.json();
+    tiShowScore(d);
+  } catch(e) {
+    tiAppendMessage('system', '⚠ Could not fetch score: ' + e.message);
+  }
+}
+
+function tiShowScore(d) {
+  const grid = document.getElementById('ti-scores-grid');
+  const card = document.getElementById('ti-scorecard');
+  const score = d.total_score ?? d.score ?? d.episode_score ?? null;
+  const items = [
+    ['Total Score', score !== null ? Number(score).toFixed(3) : '—', 'var(--gold)'],
+    ['Turns', `${d.turns_completed ?? tiState.total} / ${tiState.total}`, 'var(--ink-2)'],
+    ['Session ID', tiState.sessionId.slice(0,8) + '…', 'var(--ink-3)'],
+  ];
+  if (d.components) {
+    Object.entries(d.components).forEach(([k,v]) => {
+      items.push([k.replace(/_/g,' '), typeof v === 'number' ? v.toFixed(3) : v, 'var(--teal)']);
+    });
+  }
+  grid.innerHTML = items.map(([label,val,color]) => `
+    <div style="background:var(--paper);border:.5px solid var(--border);border-radius:8px;padding:.85rem 1rem;text-align:center">
+      <div style="font-family:var(--serif);font-size:26px;color:${color};margin-bottom:4px">${val}</div>
+      <div style="font-size:11px;color:var(--ink-4);text-transform:capitalize">${label}</div>
+    </div>`).join('');
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function tiUpdateStatus() {
+  document.getElementById('ti-turn').textContent = `${tiState.turn} / ${tiState.total}`;
+  const pct = tiState.total ? (tiState.turn / tiState.total * 100) : 0;
+  document.getElementById('ti-progress').style.width = pct + '%';
+}
+
+function tiAppendMessage(role, text, meta) {
+  const box = document.getElementById('ti-transcript');
+  const isWitness = role === 'witness';
+  const isSystem = role === 'system';
+
+  let verdictHtml = '';
+  if (meta && meta.verdict !== undefined) {
+    const pass = meta.verdict === true || meta.verdict === 'pass';
+    verdictHtml = `<div style="font-size:11px;margin-top:6px;font-weight:600;color:${pass ? 'var(--teal)' : 'var(--red)'}">${pass ? '✓ PASS' : '✗ FAIL'}${meta.reward !== undefined ? ' · reward ' + Number(meta.reward).toFixed(3) : ''}</div>`;
+  }
+
+  if (isSystem) {
+    box.insertAdjacentHTML('beforeend', `
+      <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.35);padding:.25rem 0">${text}</div>`);
+  } else {
+    const roleLabel = isWitness ? 'Witness' : 'Questioner';
+    const roleColor = isWitness ? 'var(--teal)' : 'var(--red)';
+    box.insertAdjacentHTML('beforeend', `
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${roleColor};width:76px;flex-shrink:0;padding-top:3px">${roleLabel}</div>
+        <div style="flex:1">
+          <div style="font-size:13.5px;color:${isWitness ? 'rgba(255,255,255,.82)' : 'rgba(255,255,255,.58)'};font-family:var(--serif);font-style:italic;line-height:1.7">${text}</div>
+          ${verdictHtml}
+        </div>
+      </div>`);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+function tiReset() {
+  tiState = { sessionId: null, turn: 0, total: 0, done: false, currentQuestion: null };
+  document.getElementById('ti-transcript').innerHTML = '';
+  document.getElementById('ti-idle').style.display = 'block';
+  document.getElementById('ti-persona-preview').style.display = 'none';
+  document.getElementById('ti-status').style.display = 'none';
+  document.getElementById('ti-courtroom').style.display = 'none';
+  document.getElementById('ti-input-area').style.display = 'none';
+  document.getElementById('ti-scorecard').style.display = 'none';
+  document.getElementById('ti-domain').value = '';
+}
 </script>
-
-        <script>
-            const API = window.location.origin;
-
-            async function tiSend(){
-
-                const input = document.getElementById("ti-input");
-                const output = document.getElementById("ti-output");
-
-                const text = input.value.trim();
-
-                if(!text) return;
-
-                output.innerHTML = "Thinking...";
-                input.value = "";
-
-                try {
-
-                    const r = await fetch(`${API}/step`,{
-                        method:"POST",
-                        headers:{
-                            "Content-Type":"application/json"
-                        },
-                        body:JSON.stringify({
-                            response_text:text
-                        })
-                    });
-
-                    const d = await r.json();
-
-                    output.innerHTML =
-                    d.questioner_text ||
-                    d.witness_text ||
-                    JSON.stringify(d,null,2);
-
-                } catch(err) {
-                    output.innerHTML = "Server connection failed.";
-                }
-            }
-        </script>
     </body>
 </html>
