@@ -1,0 +1,25 @@
+services:
+  witness-stand:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: witness-stand-app
+    ports:
+      - "7860:7860"
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - PIP_NO_CACHE_DIR=1
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./scripts:/app/scripts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    env_file:
+      - .env

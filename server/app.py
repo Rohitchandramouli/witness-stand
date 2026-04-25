@@ -61,10 +61,13 @@ async def dashboard():
         html_content = f.read()
 
     return HTMLResponse(content=html_content)
+<<<<<<< HEAD
 @app.get("/blog", response_class=HTMLResponse)
 async def blog():
     with open("templates/blog.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+=======
+>>>>>>> d06fefa0f2464aa52c0df866552e0dcc46cc4fa8
 
 @app.get("/health")
 async def health():
