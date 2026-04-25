@@ -37,3 +37,5 @@ Thumbs.db
 # ── Local archives / exports ──────────────────────────
 witness_stand.zip
 *.zip
+
+run.sh
