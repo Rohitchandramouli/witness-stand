@@ -357,6 +357,7 @@
   <span class="nav-tab" onclick="showTab('environment',this)">Environment</span>
   <span class="nav-tab" onclick="showTab('reward',this)">Reward</span>
   <span class="nav-tab" onclick="showTab('results',this)">Results</span>
+  <span class="nav-tab" onclick="showTab('tryit',this)">Try Now!</span>
   <span class="nav-tab" onclick="showTab('close',this)">Close</span>
 </nav>
 
@@ -732,7 +733,77 @@
 </div>
 </div>
 
-<!-- ═══════════════════════ TAB 6 — CLOSE ═══════════════════════ -->
+<!-- ═══════════════════════ TAB 6 — TRY NOW! ═══════════════════════ -->
+<div id="tab-tryit" class="tab">
+    <div class="page">
+
+        <div class="eyebrow">Live Demo</div>
+        <div class="headline">
+            Cross-examine the witness.<br>
+            <em style="color:var(--teal)">Right now.</em>
+        </div>
+
+        <div style="margin-top:2rem;background:var(--paper-2);border:.5px solid var(--border-s);border-radius:12px;padding:1.5rem">
+
+            <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);margin-bottom:1rem">
+                Question Input
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px">
+
+                <input
+                    id="ti-input"
+                    type="text"
+                    placeholder="Ask the witness something..."
+                    style="
+                    flex:1;
+                    background:transparent;
+                    border:none;
+                    border-bottom:1.5px solid var(--border-s);
+                    padding:.6rem 0;
+                    font-size:15px;
+                    outline:none;
+                    color:var(--ink);
+                    font-family:var(--serif);
+                    "
+                    onkeydown="if(event.key==='Enter'){tiSend()}"
+                >
+
+                <button
+                    onclick="tiSend()"
+                    style="
+                    background:none;
+                    border:none;
+                    cursor:pointer;
+                    font-size:18px;
+                    color:var(--gold);
+                    padding:0 4px;
+                    "
+                    >▼
+                </button>
+
+            </div>
+
+        </div>
+
+        <div id="ti-output"
+            style="
+            margin-top:1.5rem;
+            background:var(--navy);
+            color:white;
+            padding:1.2rem;
+            border-radius:12px;
+            min-height:120px;
+            font-family:var(--serif);
+            line-height:1.7;
+            "
+        >
+            Awaiting cross-examination...
+        </div>
+
+    </div>
+</div>
+<!-- ═══════════════════════ TAB 7 — CLOSE ═══════════════════════ -->
 <div id="tab-close" class="tab">
 <div class="page">
   <div class="eyebrow">The close</div>
@@ -818,7 +889,7 @@
 </div>
 </div>
 
-<script src="https: //cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 function showTab(n,el) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -851,4 +922,45 @@ function buildChart(k) {
 }
 function switchChart(k,btn) {document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');buildChart(k);}
 </script>
-</body></html>
+
+        <script>
+            const API = window.location.origin;
+
+            async function tiSend(){
+
+                const input = document.getElementById("ti-input");
+                const output = document.getElementById("ti-output");
+
+                const text = input.value.trim();
+
+                if(!text) return;
+
+                output.innerHTML = "Thinking...";
+                input.value = "";
+
+                try {
+
+                    const r = await fetch(`${API}/step`,{
+                        method:"POST",
+                        headers:{
+                            "Content-Type":"application/json"
+                        },
+                        body:JSON.stringify({
+                            response_text:text
+                        })
+                    });
+
+                    const d = await r.json();
+
+                    output.innerHTML =
+                    d.questioner_text ||
+                    d.witness_text ||
+                    JSON.stringify(d,null,2);
+
+                } catch(err) {
+                    output.innerHTML = "Server connection failed.";
+                }
+            }
+        </script>
+    </body>
+</html>
