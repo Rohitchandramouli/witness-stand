@@ -778,6 +778,8 @@ class StepRequest(BaseModel):
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
+    with open("templates/index.html", "r", encoding = "utf-8") as f:
+        html_content = f.read()
     return HTMLResponse(content=DASHBOARD_HTML)
 
 @app.get("/health")
