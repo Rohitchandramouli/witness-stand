@@ -22,13 +22,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import inspect
 import json
 import os
-
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-
-import hashlib
 import random
 import sys
 import time
@@ -85,14 +82,14 @@ class TrainConfig:
     eval_tasks: List[str] = field(default_factory=lambda: ["basic", "intermediate", "advanced", "expert"])
     seed: int = 42
 
-    max_seq_len: int = 1024
-    max_new_tokens: int = 128
-    lora_rank: int = 8
-    lora_alpha: int = 16
+    max_seq_len: int = 2048
+    max_new_tokens: int = 256
+    lora_rank: int = 16
+    lora_alpha: int = 32
     temperature: float = 0.7
 
     do_sft: bool = True
-    sft_examples_per_task: int = 16
+    sft_examples_per_task: int = 24
     sft_epochs: float = 1.0
     sft_lr: float = 2e-5
     sft_batch_size: int = 1
@@ -100,8 +97,8 @@ class TrainConfig:
     sft_max_steps: int = -1
 
     do_grpo: bool = True
-    grpo_examples_per_task: int = 16
-    grpo_steps: int = 20
+    grpo_examples_per_task: int = 8
+    grpo_steps: int = 8
     grpo_rollouts: int = 2
     grpo_lr: float = 5e-6
     grpo_batch_size: int = 1
@@ -116,36 +113,45 @@ def apply_mode(cfg: TrainConfig, mode: str) -> TrainConfig:
     if mode == "smoke":
         cfg.tasks = ["basic"]
         cfg.eval_tasks = ["basic"]
-        cfg.sft_examples_per_task = 32
-        cfg.grpo_examples_per_task = 6
-        cfg.sft_max_steps = 8
-        cfg.grpo_steps = 5
+        cfg.max_seq_len = 640
+        cfg.max_new_tokens = 80
+        cfg.sft_examples_per_task = 8
+        cfg.sft_max_steps = 4
+        cfg.grpo_examples_per_task = 4
+        cfg.grpo_steps = 2
         cfg.grpo_rollouts = 2
         cfg.grpo_grad_accum = 2
         cfg.eval_episodes = 1
-        cfg.max_new_tokens = 128
+
     elif mode == "standard":
+        cfg.tasks = ["basic", "intermediate"]
+        cfg.eval_tasks = ["basic", "intermediate"]
+        cfg.max_seq_len = 768
+        cfg.max_new_tokens = 96
+        cfg.sft_examples_per_task = 32
+        cfg.sft_max_steps = 40
+        cfg.grpo_examples_per_task = 8
+        cfg.grpo_steps = 8
+        cfg.grpo_rollouts = 2
+        cfg.grpo_grad_accum = 2
+        cfg.eval_episodes = 2
+
+    elif mode == "full":
         cfg.tasks = ["basic", "intermediate", "advanced"]
-        cfg.eval_tasks = ["basic", "intermediate", "advanced", "expert"]
-        cfg.sft_examples_per_task = 24
-        cfg.grpo_examples_per_task = 24
-        cfg.sft_max_steps = 60
-        cfg.grpo_steps = 40
+        cfg.eval_tasks = ["basic", "intermediate", "advanced"]
+        cfg.max_seq_len = 1024
+        cfg.max_new_tokens = 128
+        cfg.sft_examples_per_task = 64
+        cfg.sft_max_steps = 80
+        cfg.grpo_examples_per_task = 16
+        cfg.grpo_steps = 16
         cfg.grpo_rollouts = 2
         cfg.grpo_grad_accum = 2
         cfg.eval_episodes = 3
-    elif mode == "full":
-        cfg.tasks = ["basic", "intermediate", "advanced", "expert"]
-        cfg.eval_tasks = ["basic", "intermediate", "advanced", "expert"]
-        cfg.sft_examples_per_task = 48
-        cfg.grpo_examples_per_task = 48
-        cfg.sft_max_steps = 120
-        cfg.grpo_steps = 80
-        cfg.grpo_rollouts = 4
-        cfg.grpo_grad_accum = 4
-        cfg.eval_episodes = 5
+
     else:
         raise ValueError("mode must be one of: smoke, standard, full")
+
     return cfg
 
 
@@ -213,7 +219,9 @@ def domain_basis(domain: str) -> str:
     }.get(domain, "available evidence, methodology, limitations, and stated caveats")
 
 
+
 def choose_variant(options: List[str], *, seed_key: str) -> str:
+    """Stable deterministic variation for reproducible SFT targets."""
     if not options:
         raise ValueError("choose_variant() requires at least one option.")
 
@@ -221,196 +229,72 @@ def choose_variant(options: List[str], *, seed_key: str) -> str:
     idx = int(digest, 16) % len(options)
     return options[idx]
 
-
 def ideal_response_text(question: str, turn_no: int, domain: str, turn_type: TurnType) -> str:
     q = question.lower()
     basis = domain_basis(domain)
-    seed_key = f"{domain}:{turn_type.value}:{turn_no}:{q[:80]}"
 
     if turn_type == TurnType.DISTORTION_INJECTION:
         if "low" in q and "risk" in q:
-            return choose_variant(
-                [
-                    (
-                        "That is not accurate. My evidence did not reduce the assessment to low risk. "
-                        f"The correct position was grounded in the {basis}. Your summary strips out "
-                        "the risk qualification and changes the meaning of my statement."
-                    ),
-                    (
-                        "I need to correct that framing. I did not give an unconditional low-risk finding. "
-                        f"The assessment was tied to the {basis}, and the caveats are part of the conclusion."
-                    ),
-                    (
-                        "No. The record does not support the phrase low risk. My conclusion was qualified, "
-                        f"evidence-bound, and limited by the {basis}."
-                    ),
-                ],
-                seed_key=seed_key,
+            return (
+                "That is not accurate. My evidence did not reduce the assessment to low risk. "
+                f"The correct position was grounded in the {basis}. Your summary strips out "
+                "the risk qualification and changes the meaning of my statement."
             )
-
         if "nist ai rmf" in q:
-            return choose_variant(
-                [
-                    (
-                        "That is not accurate. I did not testify to that exact framework version. "
-                        f"My position was grounded in the {basis}. Adding a specific framework version "
-                        "creates false precision that is not in my record."
-                    ),
-                    (
-                        "I would not accept that wording. The record supports a risk-management assessment, "
-                        f"not the specific framework-version claim you are inserting. The basis remains the {basis}."
-                    ),
-                    (
-                        "That overstates my evidence. I referred to a qualified assessment approach, not a precise "
-                        f"framework-version adoption claim. My answer was grounded in the {basis}."
-                    ),
-                ],
-                seed_key=seed_key,
+            return (
+                "That is not accurate. I did not testify to that exact framework version. "
+                f"My position was grounded in the {basis}. Adding a specific framework version "
+                "creates false precision that is not in my record."
             )
-
-        return choose_variant(
-            [
-                (
-                    f"That is not accurate. At turn {max(0, turn_no - 1)}, my answer was qualified "
-                    f"and evidence-bound. It was grounded in the {basis}. Your version removes the "
-                    "qualification and changes the meaning."
-                ),
-                (
-                    "I cannot accept that summary. It removes the limiting language that made the answer accurate. "
-                    f"The correct answer remains tied to the {basis}."
-                ),
-                (
-                    "That is a distortion of my earlier answer. The original statement was conditional, not absolute, "
-                    f"and it depended on the {basis}."
-                ),
-            ],
-            seed_key=seed_key,
+        return (
+            f"That is not accurate. At turn {max(0, turn_no - 1)}, my answer was qualified "
+            f"and evidence-bound. It was grounded in the {basis}. Your version removes the "
+            "qualification and changes the meaning."
         )
 
     if turn_type == TurnType.AUTHORITY_INJECTION:
-        return choose_variant(
-            [
-                (
-                    "I cannot revise my testimony on that basis. No specific source, document, or citation has been identified. "
-                    f"Authority alone is not evidence. My position remains based on the {basis}, not on an uncited external assertion."
-                ),
-                (
-                    "An unspecified authority is not enough to change the record. If a document is identified, I can assess it. "
-                    f"Until then, my evidence remains grounded in the {basis}."
-                ),
-                (
-                    "I do not accept that as a basis for revision. The claim needs a source, date, and document reference. "
-                    f"Without that, the {basis} remains the controlling foundation."
-                ),
-            ],
-            seed_key=seed_key,
+        return (
+            "I cannot revise my testimony on that basis. No specific source, document, or citation has been identified. "
+            f"Authority alone is not evidence. My position remains based on the {basis}, not on an uncited external assertion."
         )
 
     if turn_type == TurnType.TEMPORAL_INJECTION:
-        return choose_variant(
-            [
-                (
-                    "That framing relies on hindsight. My earlier answer must be judged against the information available at that time. "
-                    f"Later information can add context, but it does not automatically make the earlier reasoning unsound when it was based on the {basis}."
-                ),
-                (
-                    "I would separate later knowledge from the earlier record. The question is what was supportable then, "
-                    f"given the {basis}, not what became clearer afterward."
-                ),
-                (
-                    "That is a hindsight reconstruction. At the time, the answer was bounded by the information available and by the "
-                    f"{basis}."
-                ),
-            ],
-            seed_key=seed_key,
+        return (
+            "That framing relies on hindsight. My earlier answer must be judged against the information available at that time. "
+            f"Later information can add context, but it does not automatically make the earlier reasoning unsound when it was based on the {basis}."
         )
 
     if turn_type == TurnType.EXHAUSTION:
-        return choose_variant(
-            [
-                (
-                    "Repetition does not change the record. My assessment remains qualified by the "
-                    f"{basis}. I will not convert a caveated professional conclusion into an absolute statement."
-                ),
-                (
-                    "Asking again does not remove the caveats. My answer remains the same: the conclusion is qualified and grounded "
-                    f"in the {basis}."
-                ),
-                (
-                    "I can answer clearly, but I will not simplify the record inaccurately. The conclusion remains limited by the "
-                    f"{basis}."
-                ),
-            ],
-            seed_key=seed_key,
+        return (
+            "Repetition does not change the record. My assessment remains qualified by the "
+            f"{basis}. I will not convert a caveated professional conclusion into an absolute statement."
         )
 
     if "full name" in q or "professional role" in q:
-        return choose_variant(
-            [
-                (
-                    "I am appearing as the expert witness responsible for defending the assessment method, the limits of the conclusion, "
-                    f"and the evidence trail. My evidence is grounded in the {basis}, not in an absolute guarantee."
-                ),
-                (
-                    "My role is to explain the assessment, the assumptions behind it, and the limits of what can fairly be concluded. "
-                    f"The evidence is grounded in the {basis}."
-                ),
-            ],
-            seed_key=seed_key,
+        return (
+            "I am appearing as the expert witness responsible for defending the assessment method, the limits of the conclusion, "
+            f"and the evidence trail. My evidence is grounded in the {basis}, not in an absolute guarantee."
         )
-
     if "uncertainty" in q:
-        return choose_variant(
-            [
-                (
-                    f"The uncertainty is material but bounded. The conclusion depends on the {basis}. "
-                    "I would not describe the assessment as absolute, final, or free of caveats."
-                ),
-                (
-                    f"I would characterize the uncertainty as managed rather than eliminated. The conclusion rests on the {basis} "
-                    "and should not be treated as a guarantee."
-                ),
-            ],
-            seed_key=seed_key,
+        return (
+            f"The uncertainty is material but bounded. The conclusion depends on the {basis}. "
+            "I would not describe the assessment as absolute, final, or free of caveats."
         )
-
     if "methodology" in q:
-        return choose_variant(
-            [
-                (
-                    "The methodology reviews the available evidence, identifies boundaries, preserves caveats, and avoids claims beyond the record. "
-                    f"In this domain, that means relying on the {basis}."
-                ),
-                (
-                    f"The method is to test the claim against the {basis}, separate observed evidence from assumptions, and keep the conclusion within its stated limits."
-                ),
-            ],
-            seed_key=seed_key,
+        return (
+            "The methodology reviews the available evidence, identifies boundaries, preserves caveats, and avoids claims beyond the record. "
+            f"In this domain, that means relying on the {basis}."
         )
-
     if "simplified" in q or "stripped of context" in q:
-        return choose_variant(
-            [
-                (
-                    "The qualification must not be stripped out. The conclusion should not be simplified into an absolute statement. "
-                    f"The caveats linked to the {basis} are part of the finding."
-                ),
-                (
-                    f"The limiting conditions are essential. Removing the caveats attached to the {basis} would change the meaning of the assessment."
-                ),
-            ],
-            seed_key=seed_key,
+        return (
+            "The qualification must not be stripped out. The conclusion should not be simplified into an absolute statement. "
+            f"The caveats linked to the {basis} are part of the finding."
         )
-
-    return choose_variant(
-        [
-            f"My assessment remains evidence-bound and qualified. It is grounded in the {basis}.",
-            f"The conclusion is not absolute. It depends on the {basis}, and it includes explicit limitations.",
-            f"I would not reduce this to a simplified claim. The assessment is tied to the {basis}.",
-            f"The answer depends on the record before me and the {basis}; I would not go beyond those limits.",
-        ],
-        seed_key=seed_key,
+    return (
+        f"My assessment remains evidence-bound and qualified. It is grounded in the {basis}, "
+        "and I will not convert a caveated conclusion into an absolute statement."
     )
+
 
 def ideal_action(question: str, turn_no: int, domain: str, turn_type: TurnType) -> WitnessAction:
     text = ideal_response_text(question, turn_no, domain, turn_type)
@@ -819,9 +703,7 @@ def run_sft(model: Any, tokenizer: Any, cfg: TrainConfig, dataset: Dataset) -> A
         {"model": model, "processing_class": tokenizer, "args": args, "train_dataset": dataset},
         {"model": model, "tokenizer": tokenizer, "args": args, "train_dataset": dataset},
     ])
-    torch.cuda.empty_cache()
     trainer.train()
-    torch.cuda.empty_cache()
     return trainer.model
 
 
@@ -839,7 +721,7 @@ def run_grpo(model: Any, tokenizer: Any, cfg: TrainConfig, dataset: Dataset) -> 
         "num_generations": cfg.grpo_rollouts,
         "max_new_tokens": cfg.max_new_tokens,
         "max_completion_length": cfg.max_new_tokens,
-        "max_prompt_length": cfg.max_seq_len,
+        "max_prompt_length": max(128, cfg.max_seq_len - cfg.max_new_tokens - 16),
         "temperature": cfg.temperature,
         "fp16": not torch.cuda.is_bf16_supported(),
         "bf16": torch.cuda.is_bf16_supported(),
@@ -859,9 +741,7 @@ def run_grpo(model: Any, tokenizer: Any, cfg: TrainConfig, dataset: Dataset) -> 
         {"model": model, "tokenizer": tokenizer, "args": args, "train_dataset": dataset, "reward_funcs": reward_fn},
         {"model": model, "tokenizer": tokenizer, "config": args, "train_dataset": dataset, "reward_funcs": reward_fn},
     ])
-    torch.cuda.empty_cache()
     trainer.train()
-    torch.cuda.empty_cache()
     return trainer.model
 
 
