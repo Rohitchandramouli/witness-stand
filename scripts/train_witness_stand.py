@@ -35,6 +35,9 @@ from typing import Any, Callable, List, Optional
 import torch
 from dotenv import load_dotenv
 
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 load_dotenv()
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -81,10 +84,10 @@ class TrainConfig:
     eval_tasks: List[str] = field(default_factory=lambda: ["basic", "intermediate", "advanced", "expert"])
     seed: int = 42
 
-    max_seq_len: int = 2048
-    max_new_tokens: int = 256
-    lora_rank: int = 16
-    lora_alpha: int = 32
+    max_seq_len: int = 1024
+    max_new_tokens: int = 128
+    lora_rank: int = 8
+    lora_alpha: int = 16
     temperature: float = 0.7
 
     do_sft: bool = True
@@ -729,6 +732,8 @@ def load_model_and_tokenizer(cfg: TrainConfig) -> tuple[Any, Any]:
         bias="none",
         use_gradient_checkpointing="unsloth",
         random_state=cfg.seed,
+        load_in_4bit = True,
+        dtype = None,
     )
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
