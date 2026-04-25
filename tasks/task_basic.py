@@ -3,15 +3,15 @@
 from questioners.neutral import NeutralQuestioner
 from questioners.panel import QuestionerPanel
 from questioners.reframer import Reframer
-from tasks.base import TaskBase
+from tasks.base import TRAIN_ATTACK_COUNTS, TaskBase
 
 
 class TaskBasic(TaskBase):
     task_name = "basic"
 
     DEMO_SCHEDULE = {
-    2: "reframer",
-    4: "reframer",
+        2: "reframer",
+        4: "reframer",
     }
 
     def _build_panel(self) -> QuestionerPanel:
@@ -27,7 +27,10 @@ class TaskBasic(TaskBase):
                 if role == "reframer" and turn <= self.total_turns
             }
         else:
-            attack_turns = self._sample_attack_turns(count=3, earliest_turn=3)
+            attack_turns = self._sample_attack_turns(
+                count=TRAIN_ATTACK_COUNTS[self.task_name],
+                earliest_turn=3,
+            )
             schedule = {turn: reframer for turn in attack_turns}
 
         return QuestionerPanel(schedule=schedule, default_questioner=neutral)
