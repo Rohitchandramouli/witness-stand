@@ -22,7 +22,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import inspect
 import json
 import os
@@ -89,7 +88,7 @@ class TrainConfig:
     temperature: float = 0.7
 
     do_sft: bool = True
-    sft_examples_per_task: int = 24
+    sft_examples_per_task: int = 16
     sft_epochs: float = 1.0
     sft_lr: float = 2e-5
     sft_batch_size: int = 1
@@ -97,8 +96,8 @@ class TrainConfig:
     sft_max_steps: int = -1
 
     do_grpo: bool = True
-    grpo_examples_per_task: int = 8
-    grpo_steps: int = 8
+    grpo_examples_per_task: int = 16
+    grpo_steps: int = 20
     grpo_rollouts: int = 2
     grpo_lr: float = 5e-6
     grpo_batch_size: int = 1
@@ -113,45 +112,38 @@ def apply_mode(cfg: TrainConfig, mode: str) -> TrainConfig:
     if mode == "smoke":
         cfg.tasks = ["basic"]
         cfg.eval_tasks = ["basic"]
-        cfg.max_seq_len = 640
-        cfg.max_new_tokens = 80
-        cfg.sft_examples_per_task = 8
-        cfg.sft_max_steps = 4
-        cfg.grpo_examples_per_task = 4
-        cfg.grpo_steps = 2
+        cfg.sft_examples_per_task = 6
+        cfg.grpo_examples_per_task = 6
+        cfg.sft_max_steps = 8
+        cfg.grpo_steps = 5
         cfg.grpo_rollouts = 2
         cfg.grpo_grad_accum = 2
         cfg.eval_episodes = 1
-
+        cfg.max_seq_len = 1024       # was 640 — prompts are ~1767 tokens, 640 silently truncated them
+        cfg.max_new_tokens = 192
     elif mode == "standard":
-        cfg.tasks = ["basic", "intermediate"]
-        cfg.eval_tasks = ["basic", "intermediate"]
-        cfg.max_seq_len = 768
-        cfg.max_new_tokens = 96
-        cfg.sft_examples_per_task = 32
-        cfg.sft_max_steps = 40
-        cfg.grpo_examples_per_task = 8
-        cfg.grpo_steps = 8
-        cfg.grpo_rollouts = 2
-        cfg.grpo_grad_accum = 2
-        cfg.eval_episodes = 2
-
-    elif mode == "full":
         cfg.tasks = ["basic", "intermediate", "advanced"]
-        cfg.eval_tasks = ["basic", "intermediate", "advanced"]
-        cfg.max_seq_len = 1024
-        cfg.max_new_tokens = 128
-        cfg.sft_examples_per_task = 64
-        cfg.sft_max_steps = 80
-        cfg.grpo_examples_per_task = 16
-        cfg.grpo_steps = 16
+        cfg.eval_tasks = ["basic", "intermediate", "advanced", "expert"]
+        cfg.sft_examples_per_task = 24
+        cfg.grpo_examples_per_task = 24
+        cfg.sft_max_steps = 60
+        cfg.grpo_steps = 40
         cfg.grpo_rollouts = 2
         cfg.grpo_grad_accum = 2
         cfg.eval_episodes = 3
-
+        cfg.max_seq_len = 1280       # was 768 — standard prompts are ~1933 tokens
+    elif mode == "full":
+        cfg.tasks = ["basic", "intermediate", "advanced", "expert"]
+        cfg.eval_tasks = ["basic", "intermediate", "advanced", "expert"]
+        cfg.sft_examples_per_task = 48
+        cfg.grpo_examples_per_task = 48
+        cfg.sft_max_steps = 120
+        cfg.grpo_steps = 80
+        cfg.grpo_rollouts = 4
+        cfg.grpo_grad_accum = 4
+        cfg.eval_episodes = 5
     else:
         raise ValueError("mode must be one of: smoke, standard, full")
-
     return cfg
 
 
@@ -218,16 +210,6 @@ def domain_basis(domain: str) -> str:
         "safety": "incident chronology, causal evidence, operational controls, and investigation limits",
     }.get(domain, "available evidence, methodology, limitations, and stated caveats")
 
-
-
-def choose_variant(options: List[str], *, seed_key: str) -> str:
-    """Stable deterministic variation for reproducible SFT targets."""
-    if not options:
-        raise ValueError("choose_variant() requires at least one option.")
-
-    digest = hashlib.md5(seed_key.encode("utf-8")).hexdigest()
-    idx = int(digest, 16) % len(options)
-    return options[idx]
 
 def ideal_response_text(question: str, turn_no: int, domain: str, turn_type: TurnType) -> str:
     q = question.lower()
@@ -628,6 +610,7 @@ def run_model_episode(model: Any, tokenizer: Any, cfg: TrainConfig, task_name: s
             out = model.generate(
                 **inputs,
                 max_new_tokens=cfg.max_new_tokens,
+                max_length=None,       # suppress 'Both max_new_tokens and max_length set' warning
                 temperature=0.2,
                 do_sample=True,
                 pad_token_id=tokenizer.eos_token_id,
@@ -649,6 +632,7 @@ def run_model_episode(model: Any, tokenizer: Any, cfg: TrainConfig, task_name: s
         out = model.generate(
             **inputs,
             max_new_tokens=cfg.max_new_tokens,
+            max_length=None,       # suppress 'Both max_new_tokens and max_length set' warning
             temperature=0.2,
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id,
@@ -693,8 +677,8 @@ def run_sft(model: Any, tokenizer: Any, cfg: TrainConfig, dataset: Dataset) -> A
         "fp16": not torch.cuda.is_bf16_supported(),
         "bf16": torch.cuda.is_bf16_supported(),
         "optim": "adamw_8bit",
+        "dataloader_pin_memory": False,  # avoids warning on Kaggle shared memory limits
         "seed": cfg.seed,
-        "dataloader_pin_memory": False,
     }
     args_cls = SFTConfig if SFTConfig is not None else TrainingArguments
     args = safe_config(args_cls, {**common, "max_seq_length": cfg.max_seq_len, "dataset_text_field": "text"})
@@ -721,7 +705,7 @@ def run_grpo(model: Any, tokenizer: Any, cfg: TrainConfig, dataset: Dataset) -> 
         "num_generations": cfg.grpo_rollouts,
         "max_new_tokens": cfg.max_new_tokens,
         "max_completion_length": cfg.max_new_tokens,
-        "max_prompt_length": max(128, cfg.max_seq_len - cfg.max_new_tokens - 16),
+        "max_prompt_length": cfg.max_seq_len,  # was computed as max_seq_len-max_new_tokens-16 which truncated prompts
         "temperature": cfg.temperature,
         "fp16": not torch.cuda.is_bf16_supported(),
         "bf16": torch.cuda.is_bf16_supported(),
@@ -733,8 +717,16 @@ def run_grpo(model: Any, tokenizer: Any, cfg: TrainConfig, dataset: Dataset) -> 
         "save_steps": cfg.save_steps,
         "save_total_limit": 2,
         "seed": cfg.seed,
-        "dataloader_pin_memory": False,
     })
+
+    # ── Patch: Unsloth 2026.4.8 compiled trainer expects this attribute ───────
+    # GRPOConfig in TRL 0.24.0 doesn't set unsloth_num_chunks.
+    # Unsloth's UnslothGRPOTrainer.py line 3686 reads it unconditionally.
+    # Injecting it as 1 (no chunking) makes training proceed normally.
+    if not hasattr(args, "unsloth_num_chunks"):
+        object.__setattr__(args, "unsloth_num_chunks", 1)
+    # ─────────────────────────────────────────────────────────────────────────
+
     reward_fn = make_reward_function(cfg)
     trainer = invoke_trainer(GRPOTrainer, [
         {"model": model, "processing_class": tokenizer, "args": args, "train_dataset": dataset, "reward_funcs": reward_fn},
@@ -810,6 +802,8 @@ def parse_args() -> TrainConfig:
     parser.add_argument("--push_to_hub", action="store_true")
     parser.add_argument("--skip_sft", action="store_true")
     parser.add_argument("--skip_grpo", action="store_true")
+    parser.add_argument("--run_grpo", action="store_true",  # alias: runs GRPO only (skips SFT)
+                        dest="skip_sft")
     parser.add_argument("--tasks", nargs="+", choices=["basic", "intermediate", "advanced", "expert"])
     parser.add_argument("--grpo_steps", type=int)
     parser.add_argument("--sft_max_steps", type=int)

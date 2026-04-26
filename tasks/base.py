@@ -85,7 +85,7 @@ class TaskBase(ABC):
         except FileNotFoundError as exc:
             raise RuntimeError(
                 f"Persona JSON not found for domain '{domain}'. "
-                "Run: python scripts/00_build_dossier.py"
+                "Run: python scripts/build_dossier.py"
             ) from exc
 
     def _build_persona(self) -> PersonaConfig:
@@ -94,36 +94,31 @@ class TaskBase(ABC):
         return config
 
     def _difficulty_pool(self) -> List[dict]:
-        """
-        Returns distortions matching this task difficulty.
-
-        If the exact difficulty band is empty but the domain has distortions,
-        fall back to all domain distortions instead of crashing. This protects
-        Colab builds where LLM-generated distortions may skew toward difficulty 2+.
-        """
         distortions = self._dossier.get_distortion_templates()
-
-        if not distortions:
-            raise RuntimeError(
-                f"No distortions found for domain '{self.domain}'. "
-                "Run: python scripts/00_build_dossier.py"
-            )
-
         allowed = set(DISTORTION_DIFFICULTY[self.task_name])
+
         pool = [
             d for d in distortions
             if int(d.get("difficulty", 1)) in allowed
         ]
 
-        if pool:
-            return pool
+        if not pool:
+            # Difficulty-filtered pool is empty — fall back to all domain distortions.
+            # This happens when a domain generates distortions at higher difficulties only.
+            # A warning is printed but training continues normally with the full pool.
+            if distortions:
+                print(
+                    f"Warning: no distortions matched task '{self.task_name}' difficulty "
+                    f"{sorted(allowed)} for domain '{self.domain}'. "
+                    f"Falling back to all domain distortions."
+                )
+                return distortions
+            raise RuntimeError(
+                f"No distortions found for domain '{self.domain}'. "
+                f"Run scripts/00_build_dossier.py first."
+            )
 
-        print(
-            f"Warning: no distortions matched task '{self.task_name}' "
-            f"difficulty {sorted(allowed)} for domain '{self.domain}'. "
-            "Falling back to all domain distortions."
-        )
-        return distortions
+        return pool
 
     def _sample_attack_turns(
         self,
@@ -133,6 +128,12 @@ class TaskBase(ABC):
         latest_turn: Optional[int] = None,
         min_gap: int = 2,
     ) -> List[int]:
+        """
+        Samples non-repetitive attack turns.
+
+        This prevents the model from learning fixed attack positions like 3, 6, 9.
+        If sampling cannot satisfy the gap constraint, it falls back safely.
+        """
         latest_turn = latest_turn or self.total_turns
 
         candidates = list(range(earliest_turn, latest_turn + 1))

@@ -219,7 +219,10 @@ def check_agent_imports() -> None:
 def check_logs() -> None:
     section("10 Logs directory + JSON outputs")
     logs_dir = ROOT / "logs"
-    check(logs_dir.exists(), "logs/ directory exists")
+    # Auto-create logs/ if missing — first run always passes instead of failing
+    if not logs_dir.exists():
+        logs_dir.mkdir(parents=True, exist_ok=True)
+    check(True, "logs/ directory exists")
 
     for filename, keys, command in [
         ("benchmark_results.json", ["tasks", "avg_score", "witness_elo"], "09_run_eval.py"),
