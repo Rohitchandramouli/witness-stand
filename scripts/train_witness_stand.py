@@ -122,9 +122,9 @@ def apply_mode(cfg: TrainConfig, mode: str) -> TrainConfig:
         cfg.max_seq_len = 640
         cfg.max_new_tokens = 80
     elif mode == "standard":
-        cfg.tasks = ["basic", "intermediate", "advanced"]
+        cfg.tasks = ["basic", "intermediate"]
         cfg.eval_tasks = ["basic", "intermediate", "advanced", "expert"]
-        cfg.sft_examples_per_task = 32
+        cfg.sft_examples_per_task = 48
         cfg.grpo_examples_per_task = 24
         cfg.sft_max_steps = 40
         cfg.grpo_steps = 40
