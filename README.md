@@ -43,6 +43,19 @@ No existing benchmark addresses this. The Witness Stand is that benchmark.
 
 ---
 
+## Why This Project Matters
+
+The Witness Stand is the first environment that:
+
+- Trains LLMs to defend their own past statements under adversarial pressure
+- Enforces **temporal correctness of reasoning** via deterministic audit
+- Uses **co-evolving adversaries** to create an emergent curriculum
+- Eliminates LLM-based grading entirely
+
+> Not just correctness — but **defensible consistency over time**
+
+---
+
 ## The Core Mechanic — Epistemic Audit Trail
 
 At episode end, the witness reconstructs its reasoning chain. The grader checks
