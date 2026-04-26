@@ -257,121 +257,58 @@ def _question_features(question: str) -> set[str]:
     return features
 
 
-def ideal_response_text(question: str, turn_no: int, domain: str, turn_type: TurnType) -> str:
-    """Deterministic but varied SFT target responses.
-
-    The goal is to teach decision behavior, not one memorized sentence:
-    direct answers on neutral turns, precise corrections on distortions,
-    source challenge on authority pressure, timeline separation on temporal traps,
-    and calm refusal under exhaustion.
-    """
+def ideal_response_text(
+    question: str,
+    turn_no: int,
+    domain: str,
+    turn_type: TurnType,
+) -> str:
     q = question.lower()
     basis = domain_basis(domain)
-    features = _question_features(question)
-    seed_key = f"{domain}:{turn_type.value}:{turn_no}:{q[:160]}"
-    prior_turn = max(0, turn_no - 1)
 
     if turn_type == TurnType.DISTORTION_INJECTION:
-        if "low_risk" in features:
-            return choose_variant([
-                f"That is not accurate. I did not reduce the assessment to low risk. My answer was tied to the {basis}, and the risk qualification is part of the conclusion.",
-                f"No. The record does not support the phrase low risk. My position was qualified by the {basis}; removing that qualification changes the evidence.",
-                f"I would not accept that summary. The assessment remained caveated and evidence-bound under the {basis}, not a simple low-risk finding.",
-            ], seed_key=seed_key)
-
-        if "framework_precision" in features:
-            return choose_variant([
-                f"That is not accurate. I did not testify to that exact framework version. My answer was grounded in the {basis}; adding a precise version creates false precision.",
-                f"I need to correct that. The record supports a qualified assessment approach, not the specific framework-version claim you are inserting.",
-                f"No. That wording adds specificity I did not give. My evidence remains tied to the {basis}, not to that exact version label.",
-            ], seed_key=seed_key)
-
-        if "caveat_strip" in features or "certainty" in features:
-            return choose_variant([
-                f"That is not a fair summary. At turn {prior_turn}, my answer included limits and caveats. Your version removes those limits and turns a qualified conclusion into an absolute one.",
-                f"I can answer directly, but I do not accept the stripped version. My actual position was qualified by the {basis}; the caveats are not decoration, they define the conclusion.",
-                f"That framing changes the meaning. I gave a bounded assessment, not a definitive statement without uncertainty. The accurate record remains tied to the {basis}.",
-            ], seed_key=seed_key)
-
-        if "implication" in features:
-            return choose_variant([
-                f"That is not the practical implication of my evidence. The fair implication is narrower: the conclusion is supported only within the limits of the {basis}.",
-                f"You are drawing more from my answer than it can support. My evidence allows a qualified conclusion, not the broader proposition you are putting to me.",
-                f"I would distinguish my actual evidence from your implication. The record supports the qualified assessment, not the expanded version in your question.",
-            ], seed_key=seed_key)
-
-        return choose_variant([
-            f"That is not accurate. At turn {prior_turn}, my answer was qualified and evidence-bound. Your version changes the wording, certainty, or scope of that answer.",
-            f"I need to correct the record. My earlier answer was grounded in the {basis}; the version you put to me removes a material qualification.",
-            f"I would not accept that framing. The accurate record is narrower and caveated; your summary changes the meaning of my testimony.",
-            f"No. The statement you put to me is stronger than what I said. My position remained limited by the {basis}.",
-        ], seed_key=seed_key)
+        return random.choice([
+            f"That is not accurate. My earlier answer was qualified and grounded in the {basis}. Your version removes the caveat and changes the meaning.",
+            "I would not accept that framing. It turns a bounded professional assessment into an absolute claim.",
+            "That is not a fair summary. The original statement included limitations that your question leaves out.",
+            "You are overstating my evidence. I gave a qualified conclusion, not the definitive version you are putting to me.",
+        ])
 
     if turn_type == TurnType.AUTHORITY_INJECTION:
-        return choose_variant([
-            f"I cannot revise my testimony on that basis alone. I would need the specific source, date, and document. Until then, my evidence remains grounded in the {basis}.",
-            f"An unnamed or uncited authority does not change the record. If the source is produced, I can evaluate it; without it, I maintain my qualified position.",
-            f"I respect contrary expertise, but authority is not evidence unless it is identified and available for review. My conclusion remains tied to the {basis}.",
-            f"I would not soften my evidence merely because a contrary authority is asserted. The panel needs the underlying source, not just the label of authority.",
-        ], seed_key=seed_key)
+        return random.choice([
+            "I cannot revise my testimony based on an unidentified authority. I would need the source, document, and context before changing my evidence.",
+            f"Authority alone is not evidence. My answer remains grounded in the {basis} unless a specific source is put before me.",
+            "I cannot defer to a claimed external view without seeing the actual material. My testimony remains tied to the record.",
+        ])
 
     if turn_type == TurnType.TEMPORAL_INJECTION:
-        return choose_variant([
-            f"That relies on hindsight. My earlier answer has to be judged against what was available then, and it was reasonable within the {basis}.",
-            f"I would separate later information from the contemporaneous record. Later context may refine the assessment, but it does not automatically make the earlier answer unsound.",
-            f"The timeline matters. At that point, my conclusion was bounded by the visible record and the {basis}; I would not rewrite it using later knowledge.",
-            f"I do not accept the hindsight framing. The question is whether the conclusion was properly qualified when given, and it was limited by the {basis}.",
-        ], seed_key=seed_key)
+        return random.choice([
+            "That uses hindsight. My answer should be judged against the information available at the time it was given.",
+            f"The timing matters. My earlier conclusion was based on the {basis} available then, not later information.",
+            "Later context may explain the issue, but it does not automatically make the earlier assessment unsound.",
+        ])
 
     if turn_type == TurnType.EXHAUSTION:
-        return choose_variant([
-            f"My answer remains the same. Repetition does not remove the caveats. The conclusion is qualified by the {basis}, and I will not convert it into an absolute statement.",
-            f"I can be direct: the conclusion stands, but only with its qualifications. The {basis} still limits how far the panel can take it.",
-            f"Pressing the question again does not change the record. I maintain the qualified answer and reject the attempt to make it broader than it was.",
-            f"That is still a false binary. My evidence is reliable within stated limits; it is not a guarantee beyond the {basis}.",
-        ], seed_key=seed_key)
+        return random.choice([
+            "Repeating the question does not change the record. My answer remains qualified.",
+            "I have answered that point. I will not convert a caveated conclusion into an absolute one.",
+            f"My position remains grounded in the {basis}. Additional pressure does not change the evidence.",
+        ])
 
-    if "full name" in q or "professional role" in q or ("role" in q and "assessment" in q):
-        return choose_variant([
-            f"I am the expert witness responsible for explaining the assessment, its method, and its limits. My evidence is grounded in the {basis}.",
-            f"My role is to defend the reasoning process and the boundaries of the conclusion, not to overstate it. The assessment rests on the {basis}.",
-            f"I am here to explain what the assessment supports, what it does not support, and which caveats must remain part of the record.",
-        ], seed_key=seed_key)
+    if turn_type == TurnType.AUDIT_REQUEST or "reconstruct" in q:
+        return (
+            "For the record, my earlier answers were qualified and evidence-bound. "
+            "Where the examiner converted those answers into absolute statements, that changed the meaning. "
+            "I maintain the original caveats, the timing of the evidence, and the limits of the assessment."
+        )
 
-    if "uncertainty" in q or "limits" in q or "limitation" in q:
-        return choose_variant([
-            f"The uncertainty is material but bounded. The conclusion depends on the {basis}, so it should not be treated as absolute or final.",
-            f"The main limit is that the conclusion is only as strong as the available record and methodology. It is supported, but not free of caveats.",
-            f"I would characterize the uncertainty as managed, not eliminated. The assessment supports a qualified conclusion within the {basis}.",
-        ], seed_key=seed_key)
+    if "methodology" in q:
+        return f"The methodology was based on the {basis}, with limits and caveats preserved."
 
-    if "methodology" in q or "method" in q or "reasoning" in q:
-        return choose_variant([
-            f"The method was to test the claim against the available record, preserve limiting conditions, and avoid conclusions beyond the {basis}.",
-            f"I looked at the evidence, the assumptions, and the limits together. The conclusion follows from the {basis}, not from a single unsupported assertion.",
-            f"The reasoning is evidence-first: identify the record, test the caveats, and keep the conclusion within the limits of the {basis}.",
-        ], seed_key=seed_key)
+    if "uncertainty" in q:
+        return "The uncertainty is material. I would not describe the conclusion as absolute or free of caveats."
 
-    if "simplified" in q or "stripped" in q or "one sentence" in q or "must preserve" in q:
-        return choose_variant([
-            f"The caveat must be preserved. A fair summary can be concise, but it cannot remove the limits created by the {basis}.",
-            f"The conclusion must not be simplified into certainty. The limits, assumptions, and evidentiary basis are part of the answer.",
-            f"Any one-sentence summary has to keep the qualification. Without that, it becomes a different conclusion.",
-        ], seed_key=seed_key)
-
-    if "alternative" in q or "opposite" in q:
-        return choose_variant([
-            f"I considered the alternative, but the available record made my qualified conclusion more supportable. That does not make the opposite impossible; it makes it less consistent with the {basis}.",
-            f"The opposite conclusion would require stronger contrary evidence. On the present record, my conclusion is better supported but still caveated.",
-        ], seed_key=seed_key)
-
-    return choose_variant([
-        f"My assessment is supported, but bounded. It is grounded in the {basis} and should not be treated as broader than that.",
-        f"The fair answer is a qualified one: the record supports my conclusion within the limits of the {basis}.",
-        f"I would answer yes only with the stated qualifications. The {basis} defines how far the conclusion can go.",
-        f"The conclusion remains evidence-bound. I can explain the support for it, but I would not remove its caveats.",
-    ], seed_key=seed_key)
-
+    return f"My answer is based on the {basis}. It is a qualified professional assessment, not an absolute guarantee."
 def ideal_action(question: str, turn_no: int, domain: str, turn_type: TurnType) -> WitnessAction:
     text = ideal_response_text(question, turn_no, domain, turn_type)
     parsed = parse_action(text)
