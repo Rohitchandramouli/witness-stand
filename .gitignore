@@ -36,3 +36,8 @@ Thumbs.db
 # ── Local archives / exports ──────────────────────────
 witness_stand.zip
 *.zip
+
+templates/witness_bot.png
+*.png
+*.jpg
+*.jpeg
