@@ -27,7 +27,7 @@ Rohit Chandramouli · Subhashree Mahimaa · Sahana Srinivasan
 [GitHub](https://github.com/Rohitchandramouli/witness-stand) ·
 [HF Space](https://huggingface.co/spaces/therubberduckdebuggers/witness-stand)
 [Kaggle](https://www.kaggle.com/code/rohitchandramouli/witness-stand)
-[blog] ()
+[blog](https://github.com/Rohitchandramouli/witness-stand/tree/main/templates/blog.md)
 ---
 
 ## The Problem
