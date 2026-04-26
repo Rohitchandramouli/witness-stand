@@ -5,10 +5,9 @@
 secrets.json
 
 # ── Runtime data and generated artifacts ──────────────
-data/
-logs/
 *.log
-
+data/*.db
+data/dossier.db
 # ── Python ────────────────────────────────────────────
 __pycache__/
 *.py[cod]

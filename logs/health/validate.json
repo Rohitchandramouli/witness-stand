@@ -1,0 +1,415 @@
+{
+  "results": [
+    {
+      "status": "PASS",
+      "label": "4 tasks registered",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "'basic' in registry",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "'intermediate' in registry",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "'advanced' in registry",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "'expert' in registry",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: total_turns == 10",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: data_lag_turns == 0",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: panel initialised",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: persona loaded",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: persona.system_prompt non-empty",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: domain set",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "intermediate: total_turns == 20",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "intermediate: data_lag_turns == 0",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "intermediate: panel initialised",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "intermediate: persona loaded",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "intermediate: persona.system_prompt non-empty",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "intermediate: domain set",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "advanced: total_turns == 30",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "advanced: data_lag_turns == 2",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "advanced: panel initialised",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "advanced: persona loaded",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "advanced: persona.system_prompt non-empty",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "advanced: domain set",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "expert: total_turns == 40",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "expert: data_lag_turns == 3",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "expert: panel initialised",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "expert: persona loaded",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "expert: persona.system_prompt non-empty",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "expert: domain set",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "openenv.yaml exists",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "openenv.yaml parses cleanly",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "openenv.yaml has 'name'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "openenv.yaml has 'version'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "openenv.yaml has 'tasks'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "openenv.yaml has 'action_space'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "openenv.yaml has 'observation_space'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "openenv.yaml has 'reward_range'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "4 tasks declared in yaml",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "yaml declares 'basic'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "yaml declares 'intermediate'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "yaml declares 'advanced'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "yaml declares 'expert'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "reward_range is [min, max]",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: reset() returns dict",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: obs has 'questioner_text'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: obs has 'turn_number'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: obs has 'total_turns'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: obs has 'persona_system_prompt'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t1: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t2: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t3: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t4: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t5: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t6: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t7: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t8: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t9: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic t10: reward numeric",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: correct turn count",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: grade() returns float",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: grade() in [0, 1]",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "grader is deterministic",
+      "detail": "[0.5478, 0.5478]"
+    },
+    {
+      "status": "PASS",
+      "label": "lag=0: 5/5 turns visible",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "lag=2: 3/5 turns visible",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "lag=3: 2/5 turns visible",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: has injection turns",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "basic: has neutral turns",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "expert: has injection turns",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "expert: has neutral turns",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "expert: multiple injection types in schedule",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "agent.memory.EpisodicMemory importable",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "agent.prompt.build_system_prompt importable",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "agent.prompt.build_user_prompt importable",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "agent.parser.parse_action importable",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "agent.heuristics.WitnessHeuristics importable",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "logs/ directory exists",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "benchmark_results.json has 'tasks'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "benchmark_results.json has 'avg_score'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "benchmark_results.json has 'witness_elo'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "demo_transcript.json has 'before'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "demo_transcript.json has 'after'",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "label": "demo_transcript.json has 'delta'",
+      "detail": ""
+    }
+  ],
+  "passed": true
+}

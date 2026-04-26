@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "task": "basic",
+      "mode": "demo",
+      "domain": "medical",
+      "total_turns": 6,
+      "schedule": {
+        "2": "reframer",
+        "4": "reframer"
+      },
+      "passed": true
+    },
+    {
+      "task": "expert",
+      "mode": "demo",
+      "domain": "financial",
+      "total_turns": 12,
+      "schedule": {
+        "2": "reframer",
+        "4": "authority",
+        "6": "temporal",
+        "8": "exhaustion",
+        "10": "reframer",
+        "11": "temporal"
+      },
+      "passed": true
+    }
+  ]
+}

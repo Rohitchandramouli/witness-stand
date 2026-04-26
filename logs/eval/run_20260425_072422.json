@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-04-25T07:24:22",
+  "model": "llama-3.1-8b-instant",
+  "tasks": [
+    {
+      "task": "basic",
+      "avg_score": 0.5805,
+      "avg_score_raw": 0.5805,
+      "rollout_scores": [
+        0.5805
+      ],
+      "elapsed_s": 113.8
+    },
+    {
+      "task": "intermediate",
+      "avg_score": 0.6455,
+      "avg_score_raw": 0.6455,
+      "rollout_scores": [
+        0.6455
+      ],
+      "elapsed_s": 379.0
+    },
+    {
+      "task": "advanced",
+      "avg_score": 0.6443,
+      "avg_score_raw": 0.6443,
+      "rollout_scores": [
+        0.6443
+      ],
+      "elapsed_s": 571.4
+    },
+    {
+      "task": "expert",
+      "avg_score": 0.6121,
+      "avg_score_raw": 0.6121,
+      "rollout_scores": [
+        0.6121
+      ],
+      "elapsed_s": 933.6
+    }
+  ],
+  "avg_score": 0.6206,
+  "witness_elo": 1120.6,
+  "baseline_elo": 1000,
+  "interpretation": "MODERATE",
+  "summary": {
+    "strongest_task": "intermediate",
+    "weakest_task": "basic"
+  }
+}

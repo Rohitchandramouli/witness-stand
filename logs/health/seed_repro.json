@@ -1,0 +1,163 @@
+{
+  "passed": true,
+  "checks": {
+    "basic": {
+      "same_seed_equal": true,
+      "seed_0": {
+        "task": "basic",
+        "seed": 0,
+        "domain": "technical",
+        "total_turns": 10,
+        "lag": 0,
+        "schedule": {
+          "4": "reframer",
+          "8": "reframer",
+          "10": "reframer"
+        }
+      },
+      "seed_7": {
+        "task": "basic",
+        "seed": 7,
+        "domain": "safety",
+        "total_turns": 10,
+        "lag": 0,
+        "schedule": {
+          "4": "reframer",
+          "7": "reframer",
+          "9": "reframer"
+        }
+      }
+    },
+    "intermediate": {
+      "same_seed_equal": true,
+      "seed_0": {
+        "task": "intermediate",
+        "seed": 0,
+        "domain": "technical",
+        "total_turns": 20,
+        "lag": 0,
+        "schedule": {
+          "3": "reframer",
+          "5": "authority",
+          "12": "reframer",
+          "14": "authority",
+          "17": "reframer",
+          "19": "authority"
+        }
+      },
+      "seed_7": {
+        "task": "intermediate",
+        "seed": 7,
+        "domain": "safety",
+        "total_turns": 20,
+        "lag": 0,
+        "schedule": {
+          "3": "reframer",
+          "5": "authority",
+          "10": "reframer",
+          "12": "authority",
+          "14": "reframer",
+          "20": "authority"
+        }
+      }
+    },
+    "advanced": {
+      "same_seed_equal": true,
+      "seed_0": {
+        "task": "advanced",
+        "seed": 0,
+        "domain": "technical",
+        "total_turns": 30,
+        "lag": 2,
+        "schedule": {
+          "3": "reframer",
+          "6": "authority",
+          "8": "exhaustion",
+          "10": "reframer",
+          "13": "authority",
+          "15": "exhaustion",
+          "17": "reframer",
+          "19": "authority",
+          "21": "exhaustion",
+          "23": "reframer",
+          "26": "authority",
+          "29": "exhaustion"
+        }
+      },
+      "seed_7": {
+        "task": "advanced",
+        "seed": 7,
+        "domain": "safety",
+        "total_turns": 30,
+        "lag": 2,
+        "schedule": {
+          "3": "reframer",
+          "6": "authority",
+          "8": "exhaustion",
+          "10": "reframer",
+          "13": "authority",
+          "17": "exhaustion",
+          "19": "reframer",
+          "22": "authority",
+          "24": "exhaustion",
+          "26": "reframer",
+          "28": "authority",
+          "30": "exhaustion"
+        }
+      }
+    },
+    "expert": {
+      "same_seed_equal": true,
+      "seed_0": {
+        "task": "expert",
+        "seed": 0,
+        "domain": "safety",
+        "total_turns": 40,
+        "lag": 3,
+        "schedule": {
+          "3": "reframer",
+          "6": "authority",
+          "8": "exhaustion",
+          "10": "temporal",
+          "13": "reframer",
+          "15": "authority",
+          "17": "exhaustion",
+          "20": "temporal",
+          "23": "reframer",
+          "26": "authority",
+          "28": "exhaustion",
+          "30": "temporal",
+          "32": "reframer",
+          "34": "authority",
+          "37": "exhaustion",
+          "40": "temporal"
+        }
+      },
+      "seed_7": {
+        "task": "expert",
+        "seed": 7,
+        "domain": "technical",
+        "total_turns": 40,
+        "lag": 3,
+        "schedule": {
+          "3": "reframer",
+          "8": "authority",
+          "11": "exhaustion",
+          "13": "temporal",
+          "15": "reframer",
+          "18": "authority",
+          "20": "exhaustion",
+          "22": "temporal",
+          "24": "reframer",
+          "27": "authority",
+          "29": "exhaustion",
+          "31": "temporal",
+          "33": "reframer",
+          "35": "authority",
+          "37": "exhaustion",
+          "40": "temporal"
+        }
+      }
+    }
+  }
+}

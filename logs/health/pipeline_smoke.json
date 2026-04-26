@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "tasks": [
+    {
+      "task": "basic",
+      "turns": 10,
+      "final_score": 0.592,
+      "min_reward": 0.25,
+      "max_reward": 0.8
+    },
+    {
+      "task": "intermediate",
+      "turns": 20,
+      "final_score": 0.561,
+      "min_reward": 0.25,
+      "max_reward": 0.8
+    },
+    {
+      "task": "advanced",
+      "turns": 30,
+      "final_score": 0.5662,
+      "min_reward": 0.12,
+      "max_reward": 0.8
+    },
+    {
+      "task": "expert",
+      "turns": 40,
+      "final_score": 0.6018,
+      "min_reward": 0.12,
+      "max_reward": 0.8
+    }
+  ]
+}

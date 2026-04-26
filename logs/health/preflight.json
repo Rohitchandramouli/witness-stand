@@ -1,0 +1,28 @@
+{
+  "imports": {
+    "environment": true,
+    "tasks.registry": true,
+    "questioners.panel": true,
+    "transcript.store": true,
+    "grader.turn_grader": true,
+    "grader.episode_grader": true,
+    "agent.memory": true,
+    "agent.prompt": true,
+    "agent.parser": true,
+    "agent.heuristics": true
+  },
+  "files": {
+    "db_exists": true,
+    "personas_dir_exists": true,
+    "personas": {
+      "financial": true,
+      "medical": true,
+      "safety": true,
+      "technical": true
+    },
+    "logs_dir_exists": true,
+    "health_dir_exists": true,
+    "groq_key_present": true
+  },
+  "passed": true
+}
