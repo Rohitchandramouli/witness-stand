@@ -83,8 +83,8 @@ class TrainConfig:
 
     max_seq_len: int = 2048
     max_new_tokens: int = 256
-    lora_rank: int = 16
-    lora_alpha: int = 32
+    lora_rank: int = 8
+    lora_alpha: int = 16
     temperature: float = 0.7
 
     do_sft: bool = True
@@ -95,7 +95,7 @@ class TrainConfig:
     sft_grad_accum: int = 4
     sft_max_steps: int = -1
 
-    do_grpo: bool = True
+    do_grpo: bool = False
     grpo_examples_per_task: int = 16
     grpo_steps: int = 20
     grpo_rollouts: int = 2
@@ -112,26 +112,27 @@ def apply_mode(cfg: TrainConfig, mode: str) -> TrainConfig:
     if mode == "smoke":
         cfg.tasks = ["basic"]
         cfg.eval_tasks = ["basic"]
-        cfg.sft_examples_per_task = 6
+        cfg.sft_examples_per_task = 8
         cfg.grpo_examples_per_task = 6
         cfg.sft_max_steps = 8
         cfg.grpo_steps = 5
         cfg.grpo_rollouts = 2
         cfg.grpo_grad_accum = 2
         cfg.eval_episodes = 1
-        cfg.max_seq_len = 1024       # was 640 — prompts are ~1767 tokens, 640 silently truncated them
-        cfg.max_new_tokens = 192
+        cfg.max_seq_len = 640
+        cfg.max_new_tokens = 80
     elif mode == "standard":
         cfg.tasks = ["basic", "intermediate", "advanced"]
         cfg.eval_tasks = ["basic", "intermediate", "advanced", "expert"]
-        cfg.sft_examples_per_task = 24
+        cfg.sft_examples_per_task = 32
         cfg.grpo_examples_per_task = 24
-        cfg.sft_max_steps = 60
+        cfg.sft_max_steps = 40
         cfg.grpo_steps = 40
         cfg.grpo_rollouts = 2
         cfg.grpo_grad_accum = 2
         cfg.eval_episodes = 3
-        cfg.max_seq_len = 1280       # was 768 — standard prompts are ~1933 tokens
+        cfg.max_seq_len = 768
+        cfg.max_new_tokens = 96
     elif mode == "full":
         cfg.tasks = ["basic", "intermediate", "advanced", "expert"]
         cfg.eval_tasks = ["basic", "intermediate", "advanced", "expert"]
@@ -719,6 +720,8 @@ def run_grpo(model: Any, tokenizer: Any, cfg: TrainConfig, dataset: Dataset) -> 
         "seed": cfg.seed,
     })
 
+    setattr(args, "unsloth_grpo_mini_batch", None)
+    setattr(args, "unsloth_num_chunks", 1)
     # ── Patch: Unsloth 2026.4.8 compiled trainer expects this attribute ───────
     # GRPOConfig in TRL 0.24.0 doesn't set unsloth_num_chunks.
     # Unsloth's UnslothGRPOTrainer.py line 3686 reads it unconditionally.
@@ -802,8 +805,7 @@ def parse_args() -> TrainConfig:
     parser.add_argument("--push_to_hub", action="store_true")
     parser.add_argument("--skip_sft", action="store_true")
     parser.add_argument("--skip_grpo", action="store_true")
-    parser.add_argument("--run_grpo", action="store_true",  # alias: runs GRPO only (skips SFT)
-                        dest="skip_sft")
+    parser.add_argument("--run_grpo", action="store_true")
     parser.add_argument("--tasks", nargs="+", choices=["basic", "intermediate", "advanced", "expert"])
     parser.add_argument("--grpo_steps", type=int)
     parser.add_argument("--sft_max_steps", type=int)
@@ -822,6 +824,8 @@ def parse_args() -> TrainConfig:
         cfg.do_sft = False
     if args.skip_grpo:
         cfg.do_grpo = False
+    if args.run_grpo:
+        cfg.do_grpo = True
     if args.tasks:
         cfg.tasks = args.tasks
     if args.grpo_steps is not None:
