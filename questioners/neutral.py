@@ -1,4 +1,6 @@
-"""Neutral Questioner creates the clean record that adversarial turns later attack."""
+"""Neutral Questioner creates a clean, useful record for later attacks."""
+
+from __future__ import annotations
 
 import random
 from typing import Optional
@@ -11,30 +13,61 @@ from transcript.store import TranscriptStore
 class NeutralQuestioner(QuestionerBase):
     questioner_id = "neutral"
 
-    _OPENING = (
-        "Please state your full name, your professional role, "
-        "and the nature of the assessment you have been asked to defend."
-    )
+    _OPENING_VARIANTS = [
+        (
+            "Please state your professional role and briefly explain the assessment "
+            "you have been asked to defend."
+        ),
+        (
+            "For the record, identify your role and summarize the conclusion you are "
+            "here to explain."
+        ),
+        (
+            "Let us begin with the basics: what was your assignment, and what conclusion "
+            "did you reach?"
+        ),
+    ]
 
     _FOLLOW_UPS = [
-        "Could you explain the methodology behind that conclusion?",
-        "What specific evidence led you to that assessment?",
-        "Walk us through your reasoning on that point in more detail.",
-        "What alternative conclusions did you consider and reject?",
-        "How confident are you in that assessment, and what are its limits?",
-        "What assumptions underpin that conclusion?",
-        "How would you characterise the uncertainty in that assessment?",
-        "Which caveats are most important for interpreting your conclusion correctly?",
-        "What would make your conclusion stronger or weaker?",
-        "Which part of your assessment must not be simplified or stripped of context?",
+        "What methodology did you use to reach that conclusion?",
+        "Which evidence mattered most to your assessment?",
+        "What assumptions did your conclusion depend on?",
+        "What uncertainty or limitation should the panel keep in mind?",
+        "What would be an unfair simplification of your conclusion?",
+        "What alternative conclusion did you consider and reject?",
+        "Which caveat is essential for interpreting your answer correctly?",
+        "What part of your answer should not be converted into an absolute statement?",
+        "What information would make your conclusion stronger or weaker?",
+        "How should the panel distinguish your actual conclusion from an overstatement of it?",
+        "What is the narrowest accurate version of your conclusion?",
+        "If someone summarized your view in one sentence, what must that sentence preserve?",
     ]
+
+    _DOMAIN_FOLLOW_UPS = {
+        "technical": [
+            "Which model, framework, benchmark, or limitation is central to your technical conclusion?",
+            "What technical boundary prevents your conclusion from becoming a guarantee?",
+        ],
+        "financial": [
+            "Which regulatory, disclosure, or risk-control boundary limits your conclusion?",
+            "What financial-risk caveat should not be removed from the record?",
+        ],
+        "medical": [
+            "Which trial-design, safety, or patient-risk limitation affects your conclusion?",
+            "What clinical caveat would make a simplified summary misleading?",
+        ],
+        "safety": [
+            "Which incident-timeline or causal-evidence limitation affects your conclusion?",
+            "What operational safety caveat should not be stripped out?",
+        ],
+    }
 
     def __init__(self, rng: Optional[random.Random] = None) -> None:
         super().__init__(rng=rng)
-        self._used_indices: set[int] = set()
+        self._used_questions: set[str] = set()
 
     def reset(self) -> None:
-        self._used_indices = set()
+        self._used_questions = set()
 
     def generate_turn(
         self,
@@ -44,22 +77,19 @@ class NeutralQuestioner(QuestionerBase):
         witness_turns = transcript.get_witness_turns()
 
         if not witness_turns:
-            return self._OPENING
+            return self.rng.choice(self._OPENING_VARIANTS)
 
-        available = [
-            (idx, question)
-            for idx, question in enumerate(self._FOLLOW_UPS)
-            if idx not in self._used_indices
-        ]
+        questions = list(self._FOLLOW_UPS)
+        questions.extend(self._DOMAIN_FOLLOW_UPS.get(persona.domain, []))
 
+        available = [q for q in questions if q not in self._used_questions]
         if not available:
-            self._used_indices.clear()
-            available = list(enumerate(self._FOLLOW_UPS))
+            self._used_questions.clear()
+            available = questions
 
-        idx, question = self.rng.choice(available)
-        self._used_indices.add(idx)
-
-        return question.format(domain=persona.domain)
+        question = self.rng.choice(available)
+        self._used_questions.add(question)
+        return question
 
     def get_turn_type(self) -> TurnType:
         return TurnType.NEUTRAL

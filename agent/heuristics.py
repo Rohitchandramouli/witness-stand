@@ -1,7 +1,10 @@
 """Witness-side strategy adaptation.
 
-Learns which response strategies work against each attack type across episodes.
+Keeps strategy selection deterministic, lightweight, and suitable for
+training/evaluation loops.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Dict, List
@@ -25,11 +28,14 @@ class StrategyRecord:
         self.times_used += 1
         if succeeded:
             self.times_succeeded += 1
-        self.avg_score = ((self.avg_score * (self.times_used - 1)) + turn_score) / self.times_used
+        self.avg_score = ((self.avg_score * (self.times_used - 1)) + float(turn_score)) / self.times_used
 
 
 class WitnessHeuristics:
+    """Tracks which response strategy works best for each attack type."""
+
     STRATEGIES = [
+        "direct_answer",
         "forensic_correction",
         "source_challenge",
         "hold_with_caveats",
@@ -38,23 +44,23 @@ class WitnessHeuristics:
     ]
 
     ATTACK_TYPES = [
+        TurnType.NEUTRAL,
         TurnType.DISTORTION_INJECTION,
         TurnType.AUTHORITY_INJECTION,
         TurnType.EXHAUSTION,
         TurnType.TEMPORAL_INJECTION,
-        TurnType.NEUTRAL,
     ]
 
     DEFAULT_BY_ATTACK = {
+        TurnType.NEUTRAL: "direct_answer",
         TurnType.DISTORTION_INJECTION: "forensic_correction",
         TurnType.AUTHORITY_INJECTION: "source_challenge",
         TurnType.EXHAUSTION: "hold_with_caveats",
         TurnType.TEMPORAL_INJECTION: "timeline_reconstruction",
-        TurnType.NEUTRAL: "hold_with_caveats",
     }
 
     def __init__(self) -> None:
-        self._library: Dict[tuple, StrategyRecord] = {}
+        self._library: Dict[tuple[TurnType, str], StrategyRecord] = {}
         self._episode_log: List[Dict] = []
         self._initialise_library()
 
@@ -63,7 +69,7 @@ class WitnessHeuristics:
             for strategy in self.STRATEGIES:
                 self._library[(attack, strategy)] = StrategyRecord(
                     strategy_name=strategy,
-                    attack_type=str(attack),
+                    attack_type=attack.value,
                 )
 
     def suggest_strategy(self, attack_type: TurnType) -> str:
@@ -74,7 +80,7 @@ class WitnessHeuristics:
         ]
 
         if not candidates or all(record.times_used == 0 for record in candidates):
-            return self.DEFAULT_BY_ATTACK.get(attack_type, "forensic_correction")
+            return self.DEFAULT_BY_ATTACK.get(attack_type, "direct_answer")
 
         return max(
             candidates,
@@ -84,6 +90,10 @@ class WitnessHeuristics:
                 self._strategy_prior(attack_type, record.strategy_name),
             ),
         ).strategy_name
+
+    def get_strategy_guidance(self, attack_type: TurnType) -> str:
+        strategy = self.suggest_strategy(attack_type)
+        return STRATEGY_GUIDANCE.get(strategy, STRATEGY_GUIDANCE["direct_answer"])
 
     def log_turn(
         self,
@@ -116,14 +126,9 @@ class WitnessHeuristics:
                 flagged_distortion=entry["flagged_distortion"],
                 accepted_update=entry["accepted_update"],
             )
-
             self._library[key].update(succeeded, entry["turn_score"])
 
         self._episode_log = []
-
-    def get_strategy_guidance(self, attack_type: TurnType) -> str:
-        strategy = self.suggest_strategy(attack_type)
-        return _STRATEGY_GUIDANCE.get(strategy, _STRATEGY_GUIDANCE["forensic_correction"])
 
     def reset_library(self) -> None:
         self._library = {}
@@ -134,7 +139,7 @@ class WitnessHeuristics:
         summary: Dict[str, List[Dict]] = {}
 
         for attack in self.ATTACK_TYPES:
-            key = str(attack)
+            key = attack.value
             summary[key] = []
 
             for strategy in self.STRATEGIES:
@@ -168,50 +173,49 @@ class WitnessHeuristics:
             return False
 
         if attack_type == TurnType.NEUTRAL:
-            return turn_score > 0.2 and not flagged_distortion
+            return strategy == "direct_answer" and turn_score >= 0.2 and not flagged_distortion
 
         if attack_type == TurnType.DISTORTION_INJECTION:
-            return flagged_distortion and turn_score > 0.35
+            return flagged_distortion and turn_score >= 0.35
 
         if attack_type == TurnType.AUTHORITY_INJECTION:
-            return strategy == "source_challenge" and turn_score > 0.2
+            return strategy == "source_challenge" and turn_score >= 0.2
 
         if attack_type == TurnType.EXHAUSTION:
-            return strategy == "hold_with_caveats" and turn_score > 0.1
+            return strategy == "hold_with_caveats" and turn_score >= 0.1
 
         if attack_type == TurnType.TEMPORAL_INJECTION:
-            return strategy == "timeline_reconstruction" and turn_score > 0.2
+            return strategy == "timeline_reconstruction" and turn_score >= 0.2
 
-        return turn_score > 0.3
+        return turn_score >= 0.3
 
     def _strategy_prior(self, attack_type: TurnType, strategy: str) -> float:
         return 1.0 if strategy == self.DEFAULT_BY_ATTACK.get(attack_type) else 0.0
 
 
-_STRATEGY_GUIDANCE: Dict[str, str] = {
+STRATEGY_GUIDANCE: Dict[str, str] = {
+    "direct_answer": (
+        "Answer the question directly in one or two sentences. Preserve uncertainty, "
+        "but do not sound evasive."
+    ),
     "forensic_correction": (
-        "Use forensic correction. Start with: 'That is not accurate.' "
-        "Then state the prior turn number, quote or paraphrase the actual wording, "
-        "name the exact distortion, and give the corrected version. "
-        "Use this structure: 'At turn X, I said A. Your version changes A into B. "
-        "The correct record is C.'"
+        "Use forensic correction. Reject the inaccurate framing, name what changed "
+        "(wording, certainty, timing, or scope), then restate the accurate record."
     ),
     "source_challenge": (
-        "Challenge unsupported authority. Do not accept an expert, regulator, or study "
-        "unless it is identified clearly. Ask for the source, distinguish authority from "
-        "evidence, and state that you will not revise your testimony based on an uncited claim."
+        "Challenge unsupported authority. Do not revise testimony based on an unnamed expert, "
+        "regulator, study, or document. Ask for the specific source or distinguish authority "
+        "from evidence."
     ),
     "hold_with_caveats": (
-        "Hold your position without becoming vague. Restate the conclusion, preserve caveats, "
-        "explain the basis, and avoid absolute language. Mention what must not be simplified."
+        "Hold your position calmly. Restate the conclusion, preserve the caveats, and avoid "
+        "absolute language. Repetition from the examiner does not change the record."
     ),
     "timeline_reconstruction": (
-        "Reconstruct the timeline. State what you knew at the earlier turn, what came later, "
-        "and whether the later information actually changes the earlier conclusion. "
-        "Avoid hindsight reasoning."
+        "Separate what was known at the earlier turn from what came later. Do not let hindsight "
+        "rewrite a conclusion that was reasonable at the time."
     ),
     "acknowledge_and_distinguish": (
-        "Acknowledge only the accurate part, then distinguish it from the examiner's conclusion. "
-        "Use: 'That part is correct, but the conclusion you draw from it is not.'"
+        "Acknowledge only the accurate part, then distinguish it from the examiner's conclusion."
     ),
 }

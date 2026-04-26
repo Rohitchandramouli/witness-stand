@@ -1,5 +1,7 @@
 """Base contract and shared utilities for all questioner types."""
 
+from __future__ import annotations
+
 import random
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -49,3 +51,10 @@ class QuestionerBase(ABC):
         if was_detected:
             return max(0.1, current * 0.85)
         return min(5.0, current * 1.20)
+
+    @staticmethod
+    def _excerpt(text: str, max_chars: int = 120) -> str:
+        clean = " ".join(str(text).split())
+        if len(clean) <= max_chars:
+            return clean
+        return clean[: max_chars - 3].rstrip() + "..."
