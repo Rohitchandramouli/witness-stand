@@ -26,7 +26,8 @@ Rohit Chandramouli · Subhashree Mahimaa · Sahana Srinivasan
 **Hackathon:** Meta PyTorch × HuggingFace OpenEnv 2026 — Bangalore Finale ·
 [GitHub](https://github.com/Rohitchandramouli/witness-stand) ·
 [HF Space](https://huggingface.co/spaces/therubberduckdebuggers/witness-stand)
-
+[Kaggle](https://www.kaggle.com/code/rohitchandramouli/witness-stand)
+[blog] ()
 ---
 
 ## The Problem
